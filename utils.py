@@ -79,7 +79,7 @@ def get_vocabulary(vocab_size, data_dir):
 	vocabulary = { '_UNK_': 0, '_PAD_': 1, '_EOS_':2, '_GO_': 3 }
 
 	#add most common tokens to the vocabulary
-	idx = max(vocabulary.values())
+	idx = max(vocabulary.values()) + 1
 	for token in most_common_tokens:
 		vocabulary[token[0]] = idx
 		idx += 1
