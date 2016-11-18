@@ -132,8 +132,11 @@ def shuffled_train_dev_split(data_dir, train_split, dev_split):
 	movies = np.array(movies)
 
 	num_movies = len(movies)
+
+	#shuffle!
 	np.random.seed(0)
 	shuffled_idx = np.random.permutation(len(movies))
+	movies = movies[shuffled_idx]
 
 	dev_idx = int(np.floor(train_split*num_movies))
 	test_idx = int(np.floor((train_split+dev_split) * num_movies ) )
