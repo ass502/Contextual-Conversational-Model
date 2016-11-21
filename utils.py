@@ -11,6 +11,12 @@ import numpy as np
 from collections import Counter
 
 
+UNK_ID = 0
+PAD_ID = 1
+EOS_ID = 2
+GO_ID = 3
+
+
 def read_data(data_dir, subset=None):
 
 	#list all the text files in data_dir
