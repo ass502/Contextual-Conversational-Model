@@ -83,14 +83,16 @@ def get_vocabulary(vocab_size, data_dir):
 
 	#by default every vocabulary needs special tokens for unknown words, padding, end of sentence, start for decoder
 	vocabulary = { '_UNK_': 0, '_PAD_': 1, '_EOS_':2, '_GO_': 3 }
+	rev_vocabulary = ['_UNK_', '_PAD_', '_EOS_', '_GO_']
 
 	#add most common tokens to the vocabulary
 	idx = max(vocabulary.values()) + 1
 	for token in most_common_tokens:
 		vocabulary[token[0]] = idx
+		rev_vocabulary.append(token[0])
 		idx += 1
 
-	return vocabulary
+	return vocabulary, rev_vocabulary
 
 
 def corpus_to_idx(vocabulary, data_dir, subset):
