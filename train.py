@@ -71,6 +71,7 @@ def read_data(input_path, output_path):
 						data_set[bucket_id].append([source_ids, target_ids])
 						break
 				source, target = source_file.readline(), target_file.readline()
+
 	return data_set
 
 
@@ -90,12 +91,13 @@ def create_model(session, forward_only):
 		dtype=dtype)
 
 	ckpt = tf.train.get_checkpoint_state(train_dir)
-	if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+	if ckpt and tf.gfile.Exists(ckpt.model_checkpoint_path):
 		print("Reading model parameters from %s" % ckpt.model_checkpoint_path)
 		model.saver.restore(session, ckpt.model_checkpoint_path)
 	else:
 		print("Created model with fresh parameters.")
 		session.run(tf.initialize_all_variables())
+
 	return model
 
 def train():
@@ -127,7 +129,13 @@ def train():
 		step_time, loss = 0.0, 0.0
 		current_step = 0
 		previous_losses = []
-		while True:
+
+		#keep track of previous perplexity and patience for early stopping
+		prev_eval_ppx = 10**6
+		patience_count = 0
+		keep_training = True
+
+		while keep_training:
 			# Choose a bucket according to data distribution. We pick a random number
 			# in [0, 1] and use the corresponding interval in train_buckets_scale.
 			random_number_01 = np.random.random_sample()
@@ -143,7 +151,8 @@ def train():
 
 			# Once in a while, we save checkpoint, print statistics, and run evals.
 			if current_step % FLAGS.steps_per_checkpoint == 0:
-			# Print statistics for the previous epoch.
+				
+				# Print statistics for the previous epoch.
 				perplexity = math.exp(float(loss)) if loss < 300 else float("inf")
 				print ("global step %d learning rate %.4f step-time %.2f perplexity %.2f" % (model.global_step.eval(), model.learning_rate.eval(), step_time, perplexity))
 				
@@ -162,12 +171,22 @@ def train():
 					if len(dev_set[bucket_id]) == 0:
 						print("  eval: empty bucket %d" % (bucket_id))
 						continue
-					encoder_inputs, decoder_inputs, target_weights = model.get_batch(dev_set, bucket_id)
+
+					encoder_inputs, decoder_inputs, target_weights = model.get_batch(dev_set, bucket_id, input_batch_size = len(dev_set[bucket_id]))
 					
-					_, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs, target_weights, bucket_id, True)
+					_, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs, target_weights, bucket_id, True, input_batch_size = len(dev_set[bucket_id]))
 				  
 					eval_ppx = math.exp(float(eval_loss)) if eval_loss < 300 else float("inf")
 					print("  eval: bucket %d perplexity %.2f" % (bucket_id, eval_ppx))
+
+				if eval_ppx > prev_eval_ppx:
+					patience_count += 1
+
+				prev_eval_ppx = eval_ppx
+
+				if patience_count == 2:
+					keep_training = False
+
 				sys.stdout.flush()
 
 
