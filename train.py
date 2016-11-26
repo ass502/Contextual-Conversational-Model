@@ -75,7 +75,7 @@ def read_data(input_path, output_path):
 	return data_set
 
 
-def create_model(session, forward_only):
+def create_model(session, forward_only, checkpoint_dir=None):
 	"""Create conversational model and initialize or load parameters in session."""
 	dtype = tf.float16 if use_fp16 else tf.float32
 	model = seq2seq.seq2seq_model(
@@ -90,7 +90,11 @@ def create_model(session, forward_only):
 		forward_only=forward_only,
 		dtype=dtype)
 
-	ckpt = tf.train.get_checkpoint_state(train_dir)
+	if checkpoint_dir is None:
+		ckpt = tf.train.get_checkpoint_state(train_dir)
+	else:
+		ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+		
 	if ckpt and tf.gfile.Exists(ckpt.model_checkpoint_path):
 		print("Reading model parameters from %s" % ckpt.model_checkpoint_path)
 		model.saver.restore(session, ckpt.model_checkpoint_path)

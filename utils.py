@@ -10,12 +10,10 @@ import os, re, sys
 import numpy as np
 from collections import Counter
 
-
 UNK_ID = 0
 PAD_ID = 1
 EOS_ID = 2
 GO_ID = 3
-
 
 def read_data(data_dir, subset=None):
 
@@ -32,6 +30,25 @@ def read_data(data_dir, subset=None):
 
 					yield f, clean_str(movie.read().lower())
 	
+
+def corpus_counts():
+
+	corpus_counts = Counter({})
+
+	data_iter = utils.read_data(data_dir)
+	for movie in data_iter:
+
+		#for each movie, get the movie-level counts per token
+		movie_token_counts = Counter(movie[1].split())
+
+		#add to corpus level counts
+		corpus_counts += movie_token_counts
+
+		print ('Counted tokens for ' + movie[0])
+
+	pickle.dump(open('corpus_token_counts.p', 'rb'))
+
+
 
 def clean_str(string):
 
@@ -60,29 +77,18 @@ def clean_str(string):
 	return string
 
 
-def get_vocabulary(vocab_size, data_dir):
+def get_vocabulary(vocab_size, path_to_counts_pickle):
 
-	corpus_counts = Counter({})
-
-	data_iter = read_data(data_dir)
-	i = 0
-	for movie in data_iter:
-
-		#for each movie, get the movie-level counts per token
-		movie_token_counts = Counter(movie[1].split())
-
-		#add to corpus level counts
-		corpus_counts += movie_token_counts
-
-		i += 1
-		if i == 3:
-			break
+	#this pickle is generated in the script corpus_counts
+	corpus_counts = pickle.load(open(path_to_counts_pickle, 'rb'))
 
 	#get the most common tokens in the corpus - subtract 4 for tokens below
 	most_common_tokens = corpus_counts.most_common(vocab_size-4)
 
 	#by default every vocabulary needs special tokens for unknown words, padding, end of sentence, start for decoder
-	vocabulary = { '_UNK_': 0, '_PAD_': 1, '_EOS_':2, '_GO_': 3 }
+	vocabulary = { '_UNK_': UNK_ID, '_PAD_': PAD_ID, '_EOS_': EOS_ID, '_GO_': GO_ID }
+
+	#these happen to be in the correct order but it is not robust
 	rev_vocabulary = ['_UNK_', '_PAD_', '_EOS_', '_GO_']
 
 	#add most common tokens to the vocabulary
@@ -133,6 +139,10 @@ def token_to_idx(token, vocabulary):
 
 def shuffled_train_dev_split(data_dir, train_split, dev_split):
 
+	'''
+	DON'T NEED THIS
+	'''
+
 	movies = []
 	for f in os.listdir(data_dir):
 		if f.endswith('.txt'):
@@ -156,7 +166,7 @@ def shuffled_train_dev_split(data_dir, train_split, dev_split):
 def batch_iter(data, batch_size, num_epochs):
 
 	'''
-	May not be necessary...
+	DON'T NEED THIS
 	'''
 
 	data_size = len(data)

@@ -9,7 +9,10 @@ It will print the response to the command line.
 
 import tensorflow as tf
 import numpy as np
+
+import train
 import utils
+
 import pickle
 
 
@@ -24,7 +27,7 @@ FLAGS = tf.app.flags.FLAGS
 class Chat_Session(object):
 
 
-	def __init__(self, vocabulary_file_path, rev_vocabulary_file_path):
+	def __init__(self, sess, vocabulary_file_path, rev_vocabulary_file_path):
 
 		#keep track of tokens - not indexes - for legibility
 		self.query_log = []
@@ -33,23 +36,53 @@ class Chat_Session(object):
 		self.vocabulary = pickle.load(open(vocabulary_file_path, 'rb'))
 		self.rev_vocabulary = pickle.load(open(rev_vocabulary_file_path, 'rb'))
 
+		#save the session
+		self.sess = sess
+
 		#load model and set the batch value to 1
-		self.model = None
+		self.model = train.create_model(self.sess,forward_only=True, checkpoint_dir=FLAGS.checkpoint_dir)
+		self.model.batch_size = 1
+
+		#get the buckets from train
+		self.buckets = train._buckets
 
 
 	def respond(self, idx_query):
 
-		#this will require passing the query (and whatever else) to the decoder
-		#then converting IDX to tokens
+		#check which bucket the query belongs to
+		bucket_id = len(self.buckets) - 1
+         	for i, bucket in enumerate(self.buckets):
+            	if bucket[0] >= len(idx_query):
+              		bucket_id = i
+              		break
 
-		response = '@#$!@#'
+		# Get a 1-element batch to feed the sentence to the model.
+		encoder_inputs, decoder_inputs, target_weights = self.model.get_batch(
+		  	{bucket_id: [(idx_query, [])]}, bucket_id)
+
+		# Get output logits for the sentence.
+		_, _, output_logits = self.model.step(self.sess, encoder_inputs, decoder_inputs,
+		                               target_weights, bucket_id, True)
+
+		'''Eventually this should sample not be greedy'''
+
+		# This is a greedy decoder - outputs are just argmaxes of output_logits.
+		outputs = [int(np.argmax(logit, axis=1)) for logit in output_logits]
+
+		# If there is an EOS symbol in outputs, cut them at that point.
+		if data_utils.EOS_ID in outputs:
+			outputs = outputs[:outputs.index(data_utils.EOS_ID)]
+
+		#convert the indexes to english
+		response = ' '.join(self.reverse_vocabulary[i] for i in outputs)
+
 		return response
 
 
 	def read_query(self):
 
 		return raw_input('You: ')
-		
+
 
 	def chat(self):
 
@@ -76,7 +109,6 @@ class Chat_Session(object):
 
 	def simulate(self, file_path):
 
-		output_filepath = ''.join(str(i) for i in np.random.randint(9, size=10))
 
 		with open(file_path, 'rb') as simulate_file:
 
@@ -90,7 +122,7 @@ class Chat_Session(object):
 				idx_response = self.respond(idx_query)
 
 				#transform response to tokens
-				response = ' '.join([reverse_vocabulary[i] for i in idx_response])
+				response = ' '.join([self.reverse_vocabulary[i] for i in idx_response])
 
 				#record query and response
 				self.query_log.append(queries[idx])
@@ -115,28 +147,30 @@ class Chat_Session(object):
 
 def main():
 
-	vocabulary = './'
-	reverse_vocabulary = './'
-	session = Chat_Session(vocabulary, reverse_vocabulary)
+	with tf.Session() as sess:
 	
-	if FLAGS.simulate_chat:
+		vocabulary = './'
+		reverse_vocabulary = './'
+		chat_session = Chat_Session(sess, vocabulary, reverse_vocabulary)
 		
-		session.simulate(FLAGS.simulate_file)
-		session.save()
+		if FLAGS.simulate_chat:
+			
+			chat_session.simulate(FLAGS.simulate_file)
+			chat_session.save()
 
-	#this is the default 
-	elif FLAGS.interactive_chat:
+		#this is the default 
+		elif FLAGS.interactive_chat:
 
-		try:
-			session.chat()
+			try:
+				chat_session.chat()
 
-		except EOFError, KeyboardInterrupt:
+			except EOFError, KeyboardInterrupt:
 
-			#Give user option to save chat logs before exiting
-			save = raw_input('\nType \'save\' to save a log of your chats. Type anything else to exit.\n')
+				#Give user option to save chat logs before exiting
+				save = raw_input('\nType \'save\' to save a log of your chats. Type anything else to exit.\n')
 
-			if save.strip().lower() == 'save':
-				session.save()
+				if save.strip().lower() == 'save':
+					chat_session.save()
 
 
 if __name__ == '__main__':
