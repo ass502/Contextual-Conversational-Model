@@ -9,6 +9,7 @@ Data prep and utils for NCM
 import os, re, sys
 import numpy as np
 from collections import Counter
+import pickle
 
 UNK_ID = 0
 PAD_ID = 1
@@ -31,11 +32,11 @@ def read_data(data_dir, subset=None):
 					yield f, clean_str(movie.read().lower())
 	
 
-def corpus_counts():
+def corpus_counts(data_dir):
 
 	corpus_counts = Counter({})
 
-	data_iter = utils.read_data(data_dir)
+	data_iter = read_data(data_dir)
 	for movie in data_iter:
 
 		#for each movie, get the movie-level counts per token
@@ -46,7 +47,7 @@ def corpus_counts():
 
 		print ('Counted tokens for ' + movie[0])
 
-	pickle.dump(open('corpus_token_counts.p', 'rb'))
+	pickle.dump(corpus_counts,open('corpus_token_counts.p', 'wb'))
 
 
 
@@ -101,7 +102,7 @@ def get_vocabulary(vocab_size, path_to_counts_pickle):
 	return vocabulary, rev_vocabulary
 
 
-def corpus_to_idx(vocabulary, data_dir, subset):
+def corpus_to_idx(vocabulary, data_dir, subset=None):
 
 	titles = []
 	corpus = []
@@ -163,6 +164,103 @@ def shuffled_train_dev_split(data_dir, train_split, dev_split):
 	return movies[:dev_idx], movies[dev_idx:test_idx], movies[test_idx:] 
 
 
+def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split,vocab_size):
+
+	train_files, dev_files, test_files = shuffled_train_dev_split(input_dir, train_split, dev_split)
+
+	vocabulary,rev_vocabulary = get_vocabulary(vocab_size, 'corpus_token_counts.p')
+
+	titles, corpus = corpus_to_idx(vocabulary, input_dir)
+
+	#write train files
+	with open(output_dir+"train_"+str(vocab_size)+".example",'wb') as example_f:
+		with open(output_dir+"train_"+str(vocab_size)+".label",'wb') as label_f:
+			for f in train_files:
+				#find index of movie in titles
+				for i in range(len(titles)):
+					if titles[i] == f:
+						break
+
+				movie_text = corpus[i]
+
+				#iterate through each sentence
+				for s in range(len(movie_text)-1):
+					#write the first line to the example file
+					for w in range(len(movie_text[s])):
+						if w < len(movie_text[s])-1:
+							example_f.write(str(movie_text[s][w])+" ")
+						else:
+							example_f.write(str(movie_text[s][w]))
+					example_f.write("\n")
+
+					#write the second line to the label file
+					for w in range(len(movie_text[s+1])):
+						if w < len(movie_text[s+1])-1:
+							label_f.write(str(movie_text[s+1][w])+" ")
+						else:
+							label_f.write(str(movie_text[s+1][w]))
+					label_f.write("\n")
+
+	#write train files
+	with open(output_dir+"dev_"+str(vocab_size)+".example",'wb') as example_f:
+		with open(output_dir+"dev_"+str(vocab_size)+".label",'wb') as label_f:
+			for f in dev_files:
+				#find index of movie in titles
+				for i in range(len(titles)):
+					if titles[i] == f:
+						break
+
+				movie_text = corpus[i]
+
+				#iterate through each sentence
+				for s in range(len(movie_text)-1):
+					#write the first line to the example file
+					for w in range(len(movie_text[s])):
+						if w < len(movie_text[s])-1:
+							example_f.write(str(movie_text[s][w])+" ")
+						else:
+							example_f.write(str(movie_text[s][w]))
+					example_f.write("\n")
+
+					#write the second line to the label file
+					for w in range(len(movie_text[s+1])):
+						if w < len(movie_text[s+1])-1:
+							label_f.write(str(movie_text[s+1][w])+" ")
+						else:
+							label_f.write(str(movie_text[s+1][w]))
+					label_f.write("\n")
+
+	#write train files
+	with open(output_dir+"test_"+str(vocab_size)+".example",'wb') as example_f:
+		with open(output_dir+"test_"+str(vocab_size)+".label",'wb') as label_f:
+			for f in test_files:
+				#find index of movie in titles
+				for i in range(len(titles)):
+					if titles[i] == f:
+						break
+
+				movie_text = corpus[i]
+
+				#iterate through each sentence
+				for s in range(len(movie_text)-1):
+					#write the first line to the example file
+					for w in range(len(movie_text[s])):
+						if w < len(movie_text[s])-1:
+							example_f.write(str(movie_text[s][w])+" ")
+						else:
+							example_f.write(str(movie_text[s][w]))
+					example_f.write("\n")
+
+					#write the second line to the label file
+					for w in range(len(movie_text[s+1])):
+						if w < len(movie_text[s+1])-1:
+							label_f.write(str(movie_text[s+1][w])+" ")
+						else:
+							label_f.write(str(movie_text[s+1][w]))
+					label_f.write("\n")
+	
+
+
 def batch_iter(data, batch_size, num_epochs):
 
 	'''
@@ -196,7 +294,7 @@ def main():
 	print clean_str(test.lower())
 	'''
 
-	data_dir = '/Users/aditinair/Desktop/NLU-DL/Contextual-Conversational-Model/data/processed_en/'
+	'''data_dir = '/Users/aditinair/Desktop/NLU-DL/Contextual-Conversational-Model/data/processed_en/'
 
 	data_iter = read_data(data_dir)
 	token_count = 0
@@ -205,7 +303,7 @@ def main():
 		token_count += len(movie[1].split())
 		movie_count += 1
 		print 'Token count: ' + str(token_count)
-		print 'Movie count: ' + str(movie_count)
+		print 'Movie count: ' + str(movie_count)'''
 
 	'''
 	vocab = get_vocabulary(1000, data_dir)
@@ -218,6 +316,10 @@ def main():
 	train_titles = train_corpus[0]
 	train_tokens = train_corpus[1]
 	'''
+
+	#corpus_counts("data/processed_en/")
+
+	create_train_dev_test_files("data/processed_en/", "data/data_idx_files/", .8, .1, 10000)
 
 
 if __name__ == '__main__':

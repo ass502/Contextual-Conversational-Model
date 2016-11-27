@@ -29,6 +29,7 @@ class seq2seq_model(object):
 		# If we use sampled softmax, we need an output projection.
 		output_projection = None
 		softmax_loss_function = None
+		
 		# Sampled softmax only makes sense if we sample less than vocabulary size.
 		"""if num_samples > 0 and num_samples < self.target_vocab_size:
 			w_t = tf.get_variable("proj_w", [self.target_vocab_size, size], dtype=dtype)
@@ -122,7 +123,11 @@ class seq2seq_model(object):
 		if not forward_only:
 			self.gradient_norms = []
 			self.updates = []
-			opt = tf.train.GradientDescentOptimizer(self.learning_rate)
+
+			#Choose which optimizer to use
+			opt = tf.train.AdamOptimizer(self.learning_rate)
+			#opt = tf.train.GradientDescentOptimizer(self.learning_rate)
+
 			for b in xrange(len(buckets)):
 				gradients = tf.gradients(self.losses[b], params)
 				clipped_gradients, norm = tf.clip_by_global_norm(gradients,max_gradient_norm)

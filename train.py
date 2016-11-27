@@ -23,8 +23,14 @@ size = 1024
 num_layers = 2
 max_gradient_norm = 5.0
 batch_size = 32
-learning_rate = 0.5
+
+#for gradient descent, initial lr is 0.5
+#learning_rate = 0.5
 learning_rate_decay_factor = .99
+
+#for Adam optimizer, initial lr is .0001
+learning_rate = .0001
+
 data_dir = ""
 train_dir = ""
 steps_per_checkpoint = 200
