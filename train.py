@@ -14,13 +14,13 @@ from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
 import utils
-import seq2seq_model
+import seq2seq
 
 
 
 vocab_size = 10000
-size = 1024
-num_layers = 2
+size = 256
+num_layers = 1
 max_gradient_norm = 5.0
 batch_size = 32
 
@@ -31,20 +31,20 @@ learning_rate_decay_factor = .99
 #for Adam optimizer, initial lr is .0001
 learning_rate = .0001
 
-data_dir = ""
-train_dir = ""
-steps_per_checkpoint = 200
+steps_per_checkpoint = 20
 use_fp16 = False
 
 tf.app.flags.DEFINE_boolean("decode", False, "Set to True for interactive decoding.")
 tf.app.flags.DEFINE_boolean("self_test", False, "Run a self-test if this is set to True.")
+tf.app.flags.DEFINE_string("data_dir", "/tmp", "Data directory")
+tf.app.flags.DEFINE_string("train_dir", "/tmp", "Training directory.")
 
 FLAGS = tf.app.flags.FLAGS
 
 _buckets = [(10, 10), (25, 25),(40,40)]
 
 
-def read_data(input_path, output_path):
+def read_data(input_path, output_path, max_size=None):
 	"""Read data from input and output files and put into buckets.
 
   Args:
@@ -66,12 +66,12 @@ def read_data(input_path, output_path):
 			counter = 0
 			while source and target and (not max_size or counter < max_size):
 				counter += 1
-				if counter % 10000 == 0:
+				if counter % 100000 == 0:
 					print("  reading data line %d" % counter)
 					sys.stdout.flush()
 				source_ids = [int(x) for x in source.split()]
 				target_ids = [int(x) for x in target.split()]
-				target_ids.append(data_processing.EOS_ID)
+				target_ids.append(utils.EOS_ID)
 				for bucket_id, (source_size, target_size) in enumerate(_buckets):
 					if len(source_ids) < source_size and len(target_ids) < target_size:
 						data_set[bucket_id].append([source_ids, target_ids])
@@ -97,7 +97,7 @@ def create_model(session, forward_only, checkpoint_dir=None):
 		dtype=dtype)
 
 	if checkpoint_dir is None:
-		ckpt = tf.train.get_checkpoint_state(train_dir)
+		ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
 	else:
 		ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
 		
@@ -110,13 +110,19 @@ def create_model(session, forward_only, checkpoint_dir=None):
 
 	return model
 
+def get_data_paths(data_dir, vocab_size):
+
+	return data_dir+"train_"+str(vocab_size)+".example", data_dir+"train_"+str(vocab_size)+".label", \
+			data_dir+"dev_"+str(vocab_size)+".example", data_dir+"dev_"+str(vocab_size)+".label",  \
+			data_dir+"test_"+str(vocab_size)+".example", data_dir+"test_"+str(vocab_size)+".label"
+
 def train():
 	"""Train a conversational model"""
 
 	# Prepare data.
-	print("Preparing data in %s" % data_dir)
-	#NEED TO WRITE THIS FUNCTION IN UTILS TO RETURN DATA PATHS 
-	in_train, out_train, in_dev, out_dev, in_test, out_test, vocab_path = utils.prepare_data(data_dir, vocab_size)
+	print("Preparing data in %s" % FLAGS.data_dir)
+	
+	in_train, out_train, in_dev, out_dev, in_test, out_test = get_data_paths(FLAGS.data_dir, vocab_size)
 
 	with tf.Session() as sess:
 	# Create model.
@@ -125,10 +131,11 @@ def train():
 
 		# Read data into buckets and compute their sizes.
 		print ("Reading development and training data.")
-		dev_set = read_data(in_dev, out_dev)
-		train_set = read_data(in_train, out_train)
+		dev_set = read_data(in_dev, out_dev, max_size = 10000)
+		train_set = read_data(in_train, out_train, max_size = 10000)
 		train_bucket_sizes = [len(train_set[b]) for b in xrange(len(_buckets))]
 		train_total_size = float(sum(train_bucket_sizes))
+
 
 		# A bucket scale is a list of increasing numbers from 0 to 1 that we'll use
 		# to select a bucket. Length of [scale[i], scale[i+1]] is proportional to
@@ -155,12 +162,12 @@ def train():
 			start_time = time.time()
 			encoder_inputs, decoder_inputs, target_weights = model.get_batch(train_set, bucket_id)
 			_, step_loss, _ = model.step(sess, encoder_inputs, decoder_inputs, target_weights, bucket_id, False)
-			step_time += (time.time() - start_time) / FLAGS.steps_per_checkpoint
-			loss += step_loss / FLAGS.steps_per_checkpoint
+			step_time += (time.time() - start_time) / steps_per_checkpoint
+			loss += step_loss / steps_per_checkpoint
 			current_step += 1
 
 			# Once in a while, we save checkpoint, print statistics, and run evals.
-			if current_step % FLAGS.steps_per_checkpoint == 0:
+			if current_step % steps_per_checkpoint == 0:
 				
 				# Print statistics for the previous epoch.
 				perplexity = math.exp(float(loss)) if loss < 300 else float("inf")
@@ -172,7 +179,7 @@ def train():
 				previous_losses.append(loss)
 
 				# Save checkpoint and zero timer and loss.
-				checkpoint_path = os.path.join(train_dir, "conversation.ckpt")
+				checkpoint_path = os.path.join(FLAGS.train_dir, "conversation.ckpt")
 				model.saver.save(sess, checkpoint_path, global_step=model.global_step)
 				step_time, loss = 0.0, 0.0
 				
@@ -182,9 +189,9 @@ def train():
 						print("  eval: empty bucket %d" % (bucket_id))
 						continue
 
-					encoder_inputs, decoder_inputs, target_weights = model.get_batch(dev_set, bucket_id, input_batch_size = len(dev_set[bucket_id]))
+					encoder_inputs, decoder_inputs, target_weights = model.get_batch(dev_set, bucket_id, input_batch_size = None)
 					
-					_, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs, target_weights, bucket_id, True, input_batch_size = len(dev_set[bucket_id]))
+					_, eval_loss, _ = model.step(sess, encoder_inputs, decoder_inputs, target_weights, bucket_id, True, input_batch_size = None)
 				  
 					eval_ppx = math.exp(float(eval_loss)) if eval_loss < 300 else float("inf")
 					print("  eval: bucket %d perplexity %.2f" % (bucket_id, eval_ppx))

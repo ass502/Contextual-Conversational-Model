@@ -10,7 +10,7 @@ import utils
 
 class seq2seq_model(object):
 
-	def __init__(self, vocab_size, buckets, size, num_layers, max_gradient_norm, batch_size, learning_rate, learning_rate_decay_factor, forward_only=False,dtype=tf.float32):
+	def __init__(self, vocab_size, buckets, size, num_layers, max_gradient_norm, batch_size, learning_rate, learning_rate_decay_factor, num_samples=512, forward_only=False,dtype=tf.float32):
 
 		'''
 		To begin: 
@@ -29,12 +29,12 @@ class seq2seq_model(object):
 		# If we use sampled softmax, we need an output projection.
 		output_projection = None
 		softmax_loss_function = None
-		
+
 		# Sampled softmax only makes sense if we sample less than vocabulary size.
-		"""if num_samples > 0 and num_samples < self.target_vocab_size:
-			w_t = tf.get_variable("proj_w", [self.target_vocab_size, size], dtype=dtype)
+		if num_samples > 0 and num_samples < self.vocab_size:
+			w_t = tf.get_variable("proj_w", [self.vocab_size, size], dtype=dtype)
 			w = tf.transpose(w_t)
-			b = tf.get_variable("proj_b", [self.target_vocab_size], dtype=dtype)
+			b = tf.get_variable("proj_b", [self.vocab_size], dtype=dtype)
 			output_projection = (w, b)
 
 			def sampled_loss(inputs, labels):
@@ -43,15 +43,15 @@ class seq2seq_model(object):
 				local_w_t = tf.cast(w_t, tf.float32)
 				local_b = tf.cast(b, tf.float32)
 				local_inputs = tf.cast(inputs, tf.float32)
-				return tf.cast(tf.nn.sampled_softmax_loss(local_w_t, local_b, local_inputs, labels, num_samples, self.target_vocab_size), dtype)
-		"""
+				return tf.cast(tf.nn.sampled_softmax_loss(local_w_t, local_b, local_inputs, labels, num_samples, self.vocab_size), dtype)
+		
 
-		def full_loss(inputs,labels):
+		"""def full_loss(inputs,labels):
 				local_inputs = tf.cast(inputs, tf.float32)
-				return tf.cast(tf.nn.softmax_cross_entropy_with_logits(inputs, labels), dtype)
+				return tf.cast(tf.nn.softmax_cross_entropy_with_logits(inputs, labels), dtype)"""
 
-		#softmax_loss_function = sampled_loss
-		softmax_loss_function = full_loss
+		softmax_loss_function = sampled_loss
+		#softmax_loss_function = full_loss
 
 
 		single_cell = tf.nn.rnn_cell.BasicLSTMCell(size)
@@ -79,7 +79,7 @@ class seq2seq_model(object):
 				num_encoder_symbols=vocab_size,
 				num_decoder_symbols=vocab_size,
 				embedding_size=size,
-				output_projection=None,
+				output_projection=output_projection,
 				feed_previous=do_decode,
 				dtype=dtype)
 
