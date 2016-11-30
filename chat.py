@@ -9,12 +9,10 @@ It will print the response to the command line.
 
 import tensorflow as tf
 import numpy as np
-
 import train
 import utils
-
 import pickle
-
+import re
 
 tf.app.flags.DEFINE_boolean("interactive_chat", True, "Talk to a user!")
 tf.app.flags.DEFINE_boolean("simulate_chat", False, "Simulate a chat by reading in static file.")
@@ -90,8 +88,8 @@ class Chat_Session(object):
 
 		while True:
 
-			#read user query
-			query = self.read_query()
+			#read user query and transform it to match corpus format
+			query = utils.format( self.read_query() )
 			
 			#transform query to idx
 			idx_query = utils.sentence_to_idx(query, self.vocabulary)
@@ -105,7 +103,7 @@ class Chat_Session(object):
 			#log user query and response
 			self.query_log.append(query)
 			self.response_log.append(response)
-
+			
 
 	def simulate(self, file_path):
 

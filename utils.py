@@ -16,6 +16,7 @@ PAD_ID = 1
 EOS_ID = 2
 GO_ID = 3
 
+
 def read_data(data_dir, subset=None):
 
 	#list all the text files in data_dir
@@ -50,7 +51,6 @@ def corpus_counts(data_dir):
 	pickle.dump(corpus_counts,open('corpus_token_counts.p', 'wb'))
 
 
-
 def clean_str(string):
 
 	'''
@@ -78,6 +78,21 @@ def clean_str(string):
 
 	return string
 
+
+def format(query):
+
+	#add a space before all apostrophes
+	query = re.sub('([\'])', r'\1 ', query)
+
+	#add a space before all the punctuation
+	query = re.sub('([.,!?():;])', r' \1', query)
+
+	#throw out extra white pace
+	query = re.sub('\s{2,}', ' ', query)
+
+	#lower case to match corpus
+	return query.lower().strip()
+		
 
 def get_vocabulary(vocab_size, path_to_counts_pickle):
 
@@ -293,9 +308,9 @@ def batch_iter(data, batch_size, num_epochs):
 
 def main():
 
-	#corpus_counts("data/processed_en/")
+	corpus_counts("data/processed_en/")
 
-	create_train_dev_test_files("data/processed_en/", "data/data_idx_files/small_model_10000/", .8, .1, 10000)
+	#create_train_dev_test_files("data/processed_en/", "data/data_idx_files/small_model_10000/", .8, .1, 10000)
 
 
 if __name__ == '__main__':
