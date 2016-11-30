@@ -16,32 +16,31 @@ import tensorflow as tf
 import utils
 import seq2seq
 
-
-
+patience_threshold = 5
 vocab_size = 10000
-size = 256
+size = 512
 num_layers = 1
 max_gradient_norm = 5.0
 batch_size = 32
 
 #for gradient descent, initial lr is 0.5
 #learning_rate = 0.5
-learning_rate_decay_factor = .99
+learning_rate_decay_factor = 1
 
 #for Adam optimizer, initial lr is .0001
 learning_rate = .0001
 
-steps_per_checkpoint = 20
+steps_per_checkpoint = 200
 use_fp16 = False
 
 tf.app.flags.DEFINE_boolean("decode", False, "Set to True for interactive decoding.")
 tf.app.flags.DEFINE_boolean("self_test", False, "Run a self-test if this is set to True.")
-tf.app.flags.DEFINE_string("data_dir", "/tmp", "Data directory")
-tf.app.flags.DEFINE_string("train_dir", "/tmp", "Training directory.")
+tf.app.flags.DEFINE_string("data_dir", "./data/data_idx_files/small_model_10000/", "Data directory")
+tf.app.flags.DEFINE_string("train_dir", "./small_model/", "Training directory.")
 
 FLAGS = tf.app.flags.FLAGS
 
-_buckets = [(10, 10), (25, 25),(40,40)]
+_buckets = [(5,5), (10, 10), (25, 25), (40,40)] #might be helpful to add another smaller bucket
 
 
 def read_data(input_path, output_path, max_size=None):
@@ -136,7 +135,6 @@ def train():
 		train_bucket_sizes = [len(train_set[b]) for b in xrange(len(_buckets))]
 		train_total_size = float(sum(train_bucket_sizes))
 
-
 		# A bucket scale is a list of increasing numbers from 0 to 1 that we'll use
 		# to select a bucket. Length of [scale[i], scale[i+1]] is proportional to
 		# the size if i-th training bucket, as used later.
@@ -148,11 +146,12 @@ def train():
 		previous_losses = []
 
 		#keep track of previous perplexity and patience for early stopping
-		prev_eval_ppx = 10**6
+		prev_eval_loss = 10**6
 		patience_count = 0
 		keep_training = True
 
 		while keep_training:
+
 			# Choose a bucket according to data distribution. We pick a random number
 			# in [0, 1] and use the corresponding interval in train_buckets_scale.
 			random_number_01 = np.random.random_sample()
@@ -184,6 +183,7 @@ def train():
 				step_time, loss = 0.0, 0.0
 				
 				# Run evals on development set and print their perplexity.
+				checkpoint_eval_loss = 0
 				for bucket_id in xrange(len(_buckets)):
 					if len(dev_set[bucket_id]) == 0:
 						print("  eval: empty bucket %d" % (bucket_id))
@@ -196,13 +196,16 @@ def train():
 					eval_ppx = math.exp(float(eval_loss)) if eval_loss < 300 else float("inf")
 					print("  eval: bucket %d perplexity %.2f" % (bucket_id, eval_ppx))
 
-				if eval_ppx > prev_eval_ppx:
+				  	checkpoint_eval_loss += eval_loss
+
+				if checkpoint_eval_loss > prev_eval_loss:
 					patience_count += 1
 
-				prev_eval_ppx = eval_ppx
+				prev_eval_loss = checkpoint_eval_loss
 
-				if patience_count == 2:
+				if patience_count == patience_threshold:
 					keep_training = False
+					print ('Overfitting occurred at step: ' + str(current_step))
 
 				sys.stdout.flush()
 

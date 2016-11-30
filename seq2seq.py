@@ -5,7 +5,6 @@ import tensorflow as tf
 import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 
-
 import utils
 
 class seq2seq_model(object):
@@ -183,6 +182,7 @@ class seq2seq_model(object):
 		else:
 			return None, outputs[0], outputs[1:]  # No gradient norm, loss, outputs.
 
+
 	def get_batch(self, data, bucket_id, input_batch_size=None):
 		encoder_size, decoder_size = self.buckets[bucket_id]
 		encoder_inputs, decoder_inputs = [], []
@@ -241,3 +241,5 @@ class seq2seq_model(object):
 					batch_weight[batch_idx] = 0.0
 			batch_weights.append(batch_weight)
 		return batch_encoder_inputs, batch_decoder_inputs, batch_weights
+
+

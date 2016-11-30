@@ -57,8 +57,9 @@ def clean_str(string):
 	The data is already cleaned quite well - but for our purposes we will need to replace times, dates and numbers
 	'''
 
-	#throw out -
-	string = string.replace('-', ' ')
+	#throw out - and other chars
+	char_reg = r'[- \] \[ ]'
+	string = re.sub(char_reg, ' ', string)
 
 	#replace time formatting with _TIME_
 	string = re.sub(r'[0-9]+ : [0-9]+ [a p]. m.', '_TIME_', string)
@@ -140,10 +141,6 @@ def token_to_idx(token, vocabulary):
 
 def shuffled_train_dev_split(data_dir, train_split, dev_split):
 
-	'''
-	DON'T NEED THIS
-	'''
-
 	movies = []
 	for f in os.listdir(data_dir):
 		if f.endswith('.txt'):
@@ -164,13 +161,20 @@ def shuffled_train_dev_split(data_dir, train_split, dev_split):
 	return movies[:dev_idx], movies[dev_idx:test_idx], movies[test_idx:] 
 
 
-def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split,vocab_size):
+def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split, vocab_size):
 
 	train_files, dev_files, test_files = shuffled_train_dev_split(input_dir, train_split, dev_split)
 
 	vocabulary,rev_vocabulary = get_vocabulary(vocab_size, 'corpus_token_counts.p')
 
 	titles, corpus = corpus_to_idx(vocabulary, input_dir)
+
+	#pickle vocabulary and rev vocabulary
+	with open(output_dir+'vocab.p', 'wb') as vocab_pickle:
+		pickle.dump(vocabulary, vocab_pickle)
+
+	with open(output_dir+'rev_vocab.p', 'wb') as rev_vocab_pickle:
+		pickle.dump(rev_vocabulary, rev_vocab_pickle)
 
 	#write train files
 	with open(output_dir+"train_"+str(vocab_size)+".example",'wb') as example_f:
@@ -201,7 +205,7 @@ def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split,vo
 							label_f.write(str(movie_text[s+1][w]))
 					label_f.write("\n")
 
-	#write train files
+	#write dev files
 	with open(output_dir+"dev_"+str(vocab_size)+".example",'wb') as example_f:
 		with open(output_dir+"dev_"+str(vocab_size)+".label",'wb') as label_f:
 			for f in dev_files:
@@ -230,7 +234,7 @@ def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split,vo
 							label_f.write(str(movie_text[s+1][w]))
 					label_f.write("\n")
 
-	#write train files
+	#write test files
 	with open(output_dir+"test_"+str(vocab_size)+".example",'wb') as example_f:
 		with open(output_dir+"test_"+str(vocab_size)+".label",'wb') as label_f:
 			for f in test_files:
@@ -289,37 +293,9 @@ def batch_iter(data, batch_size, num_epochs):
 
 def main():
 
-	'''
-	test = 'This time the damage ... was estimated at $1 . 8 billion . This isJanuary 7 , 8 : 06 P. M.'
-	print clean_str(test.lower())
-	'''
-
-	'''data_dir = '/Users/aditinair/Desktop/NLU-DL/Contextual-Conversational-Model/data/processed_en/'
-
-	data_iter = read_data(data_dir)
-	token_count = 0
-	movie_count = 1
-	for movie in data_iter:
-		token_count += len(movie[1].split())
-		movie_count += 1
-		print 'Token count: ' + str(token_count)
-		print 'Movie count: ' + str(movie_count)'''
-
-	'''
-	vocab = get_vocabulary(1000, data_dir)
-
-	#split by movie
-	train, dev, test = shuffled_train_dev_split(data_dir, 0.01,0.10)
-	
-	#can compute corpus just for subsets
-	train_corpus = corpus_to_idx(vocab, data_dir,subset=train)
-	train_titles = train_corpus[0]
-	train_tokens = train_corpus[1]
-	'''
-
 	#corpus_counts("data/processed_en/")
 
-	create_train_dev_test_files("data/processed_en/", "data/data_idx_files/", .8, .1, 10000)
+	create_train_dev_test_files("data/processed_en/", "data/data_idx_files/small_model_10000/", .8, .1, 10000)
 
 
 if __name__ == '__main__':

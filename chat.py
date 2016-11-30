@@ -19,7 +19,7 @@ import pickle
 tf.app.flags.DEFINE_boolean("interactive_chat", True, "Talk to a user!")
 tf.app.flags.DEFINE_boolean("simulate_chat", False, "Simulate a chat by reading in static file.")
 tf.app.flags.DEFINE_string("simulate_file", None, "File to read in for simulation")
-tf.app.flags.DEFINE_string("checkpoint_dir", "./tmp", "Checkpoint directory.")
+tf.app.flags.DEFINE_string("checkpoint_dir", "./small_model/", "Checkpoint directory.")
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -33,8 +33,8 @@ class Chat_Session(object):
 		self.query_log = []
 		self.response_log = []
 
-		self.vocabulary = pickle.load(open(vocabulary_file_path, 'rb'))
-		self.rev_vocabulary = pickle.load(open(rev_vocabulary_file_path, 'rb'))
+		self.vocabulary = pickle.load(open(FLAGS.data_dir+'vocab.p', 'rb'))
+		self.reverse_vocabulary = pickle.load(open(FLAGS.data_dir+'rev_vocab.p', 'rb'))
 
 		#save the session
 		self.sess = sess
@@ -52,9 +52,9 @@ class Chat_Session(object):
 		#check which bucket the query belongs to
 		bucket_id = len(self.buckets) - 1
          	for i, bucket in enumerate(self.buckets):
-            	if bucket[0] >= len(idx_query):
-              		bucket_id = i
-              		break
+				if bucket[0] >= len(idx_query):
+					bucket_id = i
+					break
 
 		# Get a 1-element batch to feed the sentence to the model.
 		encoder_inputs, decoder_inputs, target_weights = self.model.get_batch(
@@ -70,8 +70,8 @@ class Chat_Session(object):
 		outputs = [int(np.argmax(logit, axis=1)) for logit in output_logits]
 
 		# If there is an EOS symbol in outputs, cut them at that point.
-		if data_utils.EOS_ID in outputs:
-			outputs = outputs[:outputs.index(data_utils.EOS_ID)]
+		if utils.EOS_ID in outputs:
+			outputs = outputs[:outputs.index(utils.EOS_ID)]
 
 		#convert the indexes to english
 		response = ' '.join(self.reverse_vocabulary[i] for i in outputs)
@@ -97,7 +97,7 @@ class Chat_Session(object):
 			idx_query = utils.sentence_to_idx(query, self.vocabulary)
 
 			#compute response to user query
-			response = self.respond(query)
+			response = self.respond(idx_query)
 
 			#print response
 			print ('\nBOT: ' + response + '\n')
