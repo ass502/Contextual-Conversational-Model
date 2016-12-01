@@ -308,10 +308,10 @@ def batch_iter(data, batch_size, num_epochs):
 
 def main():
 
-	corpus_counts("data/processed_en/")
+	#corpus_counts("data/processed_en/")
 
 	#create_train_dev_test_files("data/processed_en/", "data/data_idx_files/small_model_10000/", .8, .1, 10000)
-
+	create_train_dev_test_files("data/processed_en/", "data/data_idx_files/1st_run_50000/",.8,.1,50000)
 
 if __name__ == '__main__':
 
