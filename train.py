@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import math
 import os
+import os.path
 import random
 import sys
 import time
@@ -32,6 +33,7 @@ learning_rate_decay_factor = 1
 learning_rate = .0001
 
 steps_per_checkpoint = 1000
+steps_per_print = 200
 use_fp16 = False
 
 tf.app.flags.DEFINE_boolean("decode", False, "Set to True for interactive decoding.")
@@ -136,6 +138,14 @@ def train():
 		train_bucket_sizes = [len(train_set[b]) for b in xrange(len(_buckets))]
 		train_total_size = float(sum(train_bucket_sizes))
 
+		if os.path.isfile(FLAGS.data_dir+'curves.txt'):
+			curves_path = FLAGS.data_dir+'curves'+str(np.random.randint(10**8))+'.txt'
+		else:
+			curves_path = FLAGS.data_dir+'curves.txt'
+
+		with open(curves_path,'wb') as out_f:
+			out_f.write("Train and Perplexity Curves:\n\n")
+
 		# A bucket scale is a list of increasing numbers from 0 to 1 that we'll use
 		# to select a bucket. Length of [scale[i], scale[i+1]] is proportional to
 		# the size if i-th training bucket, as used later.
@@ -170,11 +180,14 @@ def train():
 			current_step += 1
 
 			# Once in a while, we save checkpoint, print statistics, and run evals.
-			if current_step % steps_per_checkpoint == 0:
+			if current_step % steps_per_print == 0:
 				
 				# Print statistics for the previous epoch.
 				perplexity = math.exp(float(loss)) if loss < 300 else float("inf")
-				print ("global step %d learning rate %.4f step-time %.2f perplexity %.2f" % (model.global_step.eval(), model.learning_rate.eval(), step_time, perplexity))
+				print("global step %d learning rate %.4f step-time %.2f perplexity %.2f" % (model.global_step.eval(), model.learning_rate.eval(), step_time, perplexity))
+				with open(curves_path,'ab') as out_f:
+					out_f.write("global step %d learning rate %.4f step-time %.2f perplexity %.2f" % (model.global_step.eval(), model.learning_rate.eval(), step_time, perplexity))
+					out_f.write('\n')
 				
 				# Decrease learning rate if no improvement was seen over last 3 times.
 				#if len(previous_losses) > 2 and loss > max(previous_losses[-3:]):
@@ -182,8 +195,9 @@ def train():
 				#previous_losses.append(loss)
 
 				# Save checkpoint and zero timer and loss.
-				checkpoint_path = os.path.join(FLAGS.train_dir, "conversation.ckpt")
-				model.saver.save(sess, checkpoint_path, global_step=model.global_step)
+				if current_step % steps_per_checkpoint == 0:
+					checkpoint_path = os.path.join(FLAGS.train_dir, "conversation.ckpt")
+					model.saver.save(sess, checkpoint_path, global_step=model.global_step)
 				step_time, loss = 0.0, 0.0
 				
 				# Run evals on development set and print their perplexity.
@@ -199,6 +213,9 @@ def train():
 				  
 					eval_ppx = math.exp(float(eval_loss)) if eval_loss < 300 else float("inf")
 					print("  eval: bucket %d perplexity %.2f" % (bucket_id, eval_ppx))
+					with open(curves_path,'ab') as out_f:
+						out_f.write("  eval: bucket %d perplexity %.2f" % (bucket_id, eval_ppx))
+						out_f.write("\n\n")
 
 				  	checkpoint_eval_loss += eval_loss
 
