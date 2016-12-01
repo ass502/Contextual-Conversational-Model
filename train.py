@@ -16,10 +16,11 @@ import tensorflow as tf
 import utils
 import seq2seq
 
-patience_threshold = 5
-vocab_size = 10000
-size = 512
-num_layers = 1
+#patience_threshold = 1
+MAX_NUM_STEPS = 50000
+vocab_size = 50000
+size = 1024
+num_layers = 2
 max_gradient_norm = 5.0
 batch_size = 32
 
@@ -30,7 +31,7 @@ learning_rate_decay_factor = 1
 #for Adam optimizer, initial lr is .0001
 learning_rate = .0001
 
-steps_per_checkpoint = 200
+steps_per_checkpoint = 1000
 use_fp16 = False
 
 tf.app.flags.DEFINE_boolean("decode", False, "Set to True for interactive decoding.")
@@ -40,7 +41,7 @@ tf.app.flags.DEFINE_string("train_dir", "./small_model/", "Training directory.")
 
 FLAGS = tf.app.flags.FLAGS
 
-_buckets = [(5,5), (10, 10), (25, 25), (40,40)] #might be helpful to add another smaller bucket
+_buckets = [(5,5), (10, 10), (25, 25), (40,40)]
 
 
 def read_data(input_path, output_path, max_size=None):
@@ -143,14 +144,17 @@ def train():
 		# This is the training loop.
 		step_time, loss = 0.0, 0.0
 		current_step = 0
-		previous_losses = []
+		#previous_losses = []
 
+		'''
 		#keep track of previous perplexity and patience for early stopping
 		prev_eval_loss = 10**6
 		patience_count = 0
 		keep_training = True
 
 		while keep_training:
+		'''
+		while current_step <= MAX_NUM_STEPS:
 
 			# Choose a bucket according to data distribution. We pick a random number
 			# in [0, 1] and use the corresponding interval in train_buckets_scale.
@@ -173,9 +177,9 @@ def train():
 				print ("global step %d learning rate %.4f step-time %.2f perplexity %.2f" % (model.global_step.eval(), model.learning_rate.eval(), step_time, perplexity))
 				
 				# Decrease learning rate if no improvement was seen over last 3 times.
-				if len(previous_losses) > 2 and loss > max(previous_losses[-3:]):
-					sess.run(model.learning_rate_decay_op)
-				previous_losses.append(loss)
+				#if len(previous_losses) > 2 and loss > max(previous_losses[-3:]):
+				#	sess.run(model.learning_rate_decay_op)
+				#previous_losses.append(loss)
 
 				# Save checkpoint and zero timer and loss.
 				checkpoint_path = os.path.join(FLAGS.train_dir, "conversation.ckpt")
@@ -198,6 +202,7 @@ def train():
 
 				  	checkpoint_eval_loss += eval_loss
 
+				'''
 				if checkpoint_eval_loss > prev_eval_loss:
 					patience_count += 1
 
@@ -206,6 +211,7 @@ def train():
 				if patience_count == patience_threshold:
 					keep_training = False
 					print ('Overfitting occurred at step: ' + str(current_step))
+				'''
 
 				sys.stdout.flush()
 

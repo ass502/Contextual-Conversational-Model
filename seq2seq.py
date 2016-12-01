@@ -133,7 +133,7 @@ class seq2seq_model(object):
 				self.gradient_norms.append(norm)
 				self.updates.append(opt.apply_gradients(zip(clipped_gradients, params), global_step=self.global_step))
 
-		self.saver = tf.train.Saver(tf.all_variables())
+		self.saver = tf.train.Saver(tf.all_variables(),keep_checkpoint_every_n_hours=2)
 
 	def step(self, session, encoder_inputs, decoder_inputs, target_weights, bucket_id, forward_only, input_batch_size=None):
 		# Check if the sizes match.

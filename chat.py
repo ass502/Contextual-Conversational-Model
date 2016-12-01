@@ -12,6 +12,7 @@ import numpy as np
 import train
 import utils
 import pickle
+import sys
 import re
 
 tf.app.flags.DEFINE_boolean("interactive_chat", True, "Talk to a user!")
@@ -58,13 +59,14 @@ class Chat_Session(object):
 		encoder_inputs, decoder_inputs, target_weights = self.model.get_batch(
 		  	{bucket_id: [(idx_query, [])]}, bucket_id)
 
-		# Get output logits for the sentence.
+		# Get output logits for the sentence. Shape of output_logits is decoder_size x vocabulary_size
 		_, _, output_logits = self.model.step(self.sess, encoder_inputs, decoder_inputs,
 		                               target_weights, bucket_id, True)
 
 		'''Eventually this should sample not be greedy'''
 
 		# This is a greedy decoder - outputs are just argmaxes of output_logits.
+		# Now outputs is list of length = decoder_size
 		outputs = [int(np.argmax(logit, axis=1)) for logit in output_logits]
 
 		# If there is an EOS symbol in outputs, cut them at that point.
