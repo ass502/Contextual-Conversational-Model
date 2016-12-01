@@ -38,7 +38,7 @@ use_fp16 = False
 
 tf.app.flags.DEFINE_boolean("decode", False, "Set to True for interactive decoding.")
 tf.app.flags.DEFINE_boolean("self_test", False, "Run a self-test if this is set to True.")
-tf.app.flags.DEFINE_string("data_dir", "./data/data_idx_files/1st_run_10000/", "Data directory")
+tf.app.flags.DEFINE_string("data_dir", "./data/data_idx_files/1st_run_50000/", "Data directory")
 tf.app.flags.DEFINE_string("train_dir", "./1st_baseline/", "Training directory.")
 
 FLAGS = tf.app.flags.FLAGS
