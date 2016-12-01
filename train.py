@@ -36,8 +36,8 @@ use_fp16 = False
 
 tf.app.flags.DEFINE_boolean("decode", False, "Set to True for interactive decoding.")
 tf.app.flags.DEFINE_boolean("self_test", False, "Run a self-test if this is set to True.")
-tf.app.flags.DEFINE_string("data_dir", "./data/data_idx_files/small_model_10000/", "Data directory")
-tf.app.flags.DEFINE_string("train_dir", "./small_model/", "Training directory.")
+tf.app.flags.DEFINE_string("data_dir", "./data/data_idx_files/1st_run_10000/", "Data directory")
+tf.app.flags.DEFINE_string("train_dir", "./1st_baseline/", "Training directory.")
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -131,8 +131,8 @@ def train():
 
 		# Read data into buckets and compute their sizes.
 		print ("Reading development and training data.")
-		dev_set = read_data(in_dev, out_dev, max_size = 10000)
-		train_set = read_data(in_train, out_train, max_size = 10000)
+		dev_set = read_data(in_dev, out_dev)
+		train_set = read_data(in_train, out_train)
 		train_bucket_sizes = [len(train_set[b]) for b in xrange(len(_buckets))]
 		train_total_size = float(sum(train_bucket_sizes))
 
