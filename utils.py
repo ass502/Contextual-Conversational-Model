@@ -10,6 +10,7 @@ import os, re, sys
 import numpy as np
 from collections import Counter
 import pickle
+import nltk.metrics.distance
 
 UNK_ID = 0
 PAD_ID = 1
@@ -138,20 +139,23 @@ def corpus_to_idx(vocabulary, data_dir, subset=None):
 	return titles, corpus
 
 
-def sentence_to_idx(sentence, vocabulary):
+def sentence_to_idx(sentence, vocabulary, edit_token_threshold=None, rev_vocabulary=None):
 
 	'''Sentence is a string - we convert it to the corresponding idx-es in the vocabulary.'''
 
 	tokens = sentence.strip().split(' ')
-	return [token_to_idx(token, vocabulary) for token in tokens]
+	return [token_to_idx(token, vocabulary,edit_token_threshold,rev_vocabulary) for token in tokens]
 
 
-def token_to_idx(token, vocabulary):
+def token_to_idx(token, vocabulary, edit_token_threshold=None, rev_vocabulary=None):
 
 	try:
 		return vocabulary[token]
 	except KeyError:
-		return vocabulary['_UNK_']
+		if edit_token_threshold is None:
+			return vocabulary['_UNK_']
+		else:
+			return closest_edit_token(token, rev_vocabulary, edit_token_threshold)
 
 
 def shuffled_train_dev_split(data_dir, train_split, dev_split):
@@ -305,6 +309,51 @@ def batch_iter(data, batch_size, num_epochs):
 		shuffled_idx = np.random.permutation(len(data))
 		data = data[shuffled_idx]
 
+
+def weighted_draw(vals):
+
+	probs = softmax(vals)
+	return np.random.choice(len(vals),1,p=probs)[0]
+
+
+def softmax(x):
+
+	#take the exponents shifted over, for efficiency
+	exps = np.exp(x - np.max(x))
+	return exps/np.sum(exps)
+
+
+def closest_edit_token(token, rev_vocabulary, threshold=3):
+
+	'''
+	Unlike the commented-out solution, this allows us to store and sort through fewer items. 
+	'''
+
+	
+	distances = []
+	closest_idx = []
+
+	for idx, vocab_token in enumerate(rev_vocabulary):
+		if idx > GO_ID:
+			dist = nltk.metrics.distance.edit_distance(token, vocab_token)
+			if dist <= threshold:
+				distances.append(dist)
+				closest_idx.append(idx)
+
+	if len(distances) == 0:
+		return UNK_ID
+	else:
+		return closest_idx[ np.argmin(distances) ]
+	
+	'''
+	distances = [10000 if idx <= GO_ID else nltk.metrics.distance.edit_distance(token, vocab_token) for idx, vocab_token in enumerate(rev_vocabulary) ]
+	sort_idx = np.argsort(distances)
+	for idx in sort_idx:
+		if distances[idx] <= threshold:
+			return idx
+		else:
+			return UNK_ID
+	'''
 
 def main():
 

@@ -15,10 +15,12 @@ import pickle
 import sys
 import re
 
-tf.app.flags.DEFINE_boolean("interactive_chat", True, "Talk to a user!")
-tf.app.flags.DEFINE_boolean("simulate_chat", False, "Simulate a chat by reading in static file.")
-tf.app.flags.DEFINE_string("simulate_file", None, "File to read in for simulation")
-tf.app.flags.DEFINE_string("checkpoint_dir", "./small_model/", "Checkpoint directory.")
+tf.app.flags.DEFINE_boolean('interactive_chat', True, 'Talk to a user!')
+tf.app.flags.DEFINE_string('simulate_file', '', 'File to read in for simulation')
+tf.app.flags.DEFINE_string('checkpoint_dir', './models/small_model/', 'Checkpoint directory.')
+tf.app.flags.DEFINE_string('vocab_dir', './data/data_idx_files/small_model_10000/', 'Checkpoint directory.')
+tf.app.flags.DEFINE_boolean('old_decoder', False, 'How to decode')
+tf.app.flags.DEFINE_integer('edit_threshold', None, 'Threshold for edit distance - None does not implement feature')
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -32,8 +34,8 @@ class Chat_Session(object):
 		self.query_log = []
 		self.response_log = []
 
-		self.vocabulary = pickle.load(open(FLAGS.data_dir+'vocab.p', 'rb'))
-		self.reverse_vocabulary = pickle.load(open(FLAGS.data_dir+'rev_vocab.p', 'rb'))
+		self.vocabulary = pickle.load(open(FLAGS.vocab_dir+'vocab.p', 'rb'))
+		self.reverse_vocabulary = pickle.load(open(FLAGS.vocab_dir+'rev_vocab.p', 'rb'))
 
 		#save the session
 		self.sess = sess
@@ -55,26 +57,45 @@ class Chat_Session(object):
 					bucket_id = i
 					break
 
-		# Get a 1-element batch to feed the sentence to the model.
-		encoder_inputs, decoder_inputs, target_weights = self.model.get_batch(
-		  	{bucket_id: [(idx_query, [])]}, bucket_id)
+		#This is the method from the tutorial
+		if FLAGS.old_decoder:
 
-		# Get output logits for the sentence. Shape of output_logits is decoder_size x vocabulary_size
-		_, _, output_logits = self.model.step(self.sess, encoder_inputs, decoder_inputs,
-		                               target_weights, bucket_id, True)
+			# Get a 1-element batch to feed the sentence to the model.
+			encoder_inputs, decoder_inputs, target_weights = self.model.get_batch(
+			  	{bucket_id: [(idx_query, [])]}, bucket_id)
 
-		'''Eventually this should sample not be greedy'''
+			# Get output logits for the sentence. Shape of output_logits is decoder_size x vocabulary_size
+			_, _, output_logits = self.model.step(self.sess, encoder_inputs, decoder_inputs,
+			                               target_weights, bucket_id, True)
 
-		# This is a greedy decoder - outputs are just argmaxes of output_logits.
-		# Now outputs is list of length = decoder_size
-		outputs = [int(np.argmax(logit, axis=1)) for logit in output_logits]
+			# This is a greedy decoder - outputs are just argmaxes of output_logits.
+			# Now outputs is list of length = decoder_size
+			idx_response = [int(np.argmax(logit, axis=1)) for logit in output_logits]
+
+
+		#This is the method where we condition on previous inputs
+		else:
+
+			idx_response = []
+			for i in range(self.buckets[bucket_id][1]):
+
+				# Get a 1-element batch to feed the sentence to the model.
+				encoder_inputs, decoder_inputs, target_weights = self.model.get_batch(
+				  	{bucket_id: [(idx_query, idx_response)]}, bucket_id)
+
+				# Get output logits for the sentence. Shape of output_logits is decoder_size x vocabulary_size
+				_, _, output_logits = self.model.step(self.sess, encoder_inputs, decoder_inputs,
+				                               target_weights, bucket_id, True)
+
+				#idx_response.append( int(np.argmax(output_logits[i],axis=1)) )
+				idx_response.append( utils.weighted_draw(output_logits[i][0]) )
 
 		# If there is an EOS symbol in outputs, cut them at that point.
-		if utils.EOS_ID in outputs:
-			outputs = outputs[:outputs.index(utils.EOS_ID)]
+		if utils.EOS_ID in idx_response:
+			idx_response = idx_response[:idx_response.index(utils.EOS_ID)]
 
 		#convert the indexes to english
-		response = ' '.join(self.reverse_vocabulary[i] for i in outputs)
+		response = ' '.join(self.reverse_vocabulary[i] for i in idx_response)
 
 		return response
 
@@ -94,7 +115,7 @@ class Chat_Session(object):
 			query = utils.format( self.read_query() )
 			
 			#transform query to idx
-			idx_query = utils.sentence_to_idx(query, self.vocabulary)
+			idx_query = utils.sentence_to_idx(query, self.vocabulary, edit_token_threshold=FLAGS.edit_threshold, rev_vocabulary=self.reverse_vocabulary)
 
 			#compute response to user query
 			response = self.respond(idx_query)
@@ -114,7 +135,7 @@ class Chat_Session(object):
 
 			#read queries and transform to idx
 			queries = simulate_file.read().splitlines()
-			idx_queries = [utils.sentence_to_idx(sentence, self.vocabulary) for sentence in queries]
+			idx_queries = [utils.sentence_to_idx(sentence, self.vocabulary, edit_token_threshold=FLAGS.edit_threshold, rev_vocabulary=self.reverse_vocabulary) for sentence in queries]
 
 			for idx_query in idx_queries:
 
@@ -153,7 +174,7 @@ def main():
 		reverse_vocabulary = './'
 		chat_session = Chat_Session(sess, vocabulary, reverse_vocabulary)
 		
-		if FLAGS.simulate_chat:
+		if len(FLAGS.simulate_file):
 			
 			chat_session.simulate(FLAGS.simulate_file)
 			chat_session.save()
