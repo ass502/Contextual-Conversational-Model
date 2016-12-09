@@ -19,7 +19,7 @@ tf.app.flags.DEFINE_boolean('interactive_chat', True, 'Talk to a user!')
 tf.app.flags.DEFINE_string('simulate_file', '', 'File to read in for simulation')
 tf.app.flags.DEFINE_string('checkpoint_dir', './models/small_model/', 'Checkpoint directory.')
 tf.app.flags.DEFINE_string('vocab_dir', './data/data_idx_files/small_model_10000/', 'Checkpoint directory.')
-tf.app.flags.DEFINE_boolean('old_decoder', False, 'How to decode')
+tf.app.flags.DEFINE_boolean('argmax_decoder', False, 'How to decode')
 tf.app.flags.DEFINE_integer('edit_threshold', None, 'Threshold for edit distance - None does not implement feature')
 
 FLAGS = tf.app.flags.FLAGS
@@ -58,7 +58,7 @@ class Chat_Session(object):
 					break
 
 		#This is the method from the tutorial
-		if FLAGS.old_decoder:
+		if FLAGS.argmax_decoder:
 
 			# Get a 1-element batch to feed the sentence to the model.
 			encoder_inputs, decoder_inputs, target_weights = self.model.get_batch(

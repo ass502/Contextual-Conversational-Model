@@ -325,16 +325,13 @@ def softmax(x):
 
 def closest_edit_token(token, rev_vocabulary, threshold=3):
 
-	'''
-	Unlike the commented-out solution, this allows us to store and sort through fewer items. 
-	'''
+	max_id = max(UNK_ID, PAD_ID, EOS_ID, GO_ID)
 
-	
 	distances = []
 	closest_idx = []
 
 	for idx, vocab_token in enumerate(rev_vocabulary):
-		if idx > GO_ID:
+		if idx > max_id:
 			dist = nltk.metrics.distance.edit_distance(token, vocab_token)
 			if dist <= threshold:
 				distances.append(dist)
@@ -345,15 +342,6 @@ def closest_edit_token(token, rev_vocabulary, threshold=3):
 	else:
 		return closest_idx[ np.argmin(distances) ]
 	
-	'''
-	distances = [10000 if idx <= GO_ID else nltk.metrics.distance.edit_distance(token, vocab_token) for idx, vocab_token in enumerate(rev_vocabulary) ]
-	sort_idx = np.argsort(distances)
-	for idx in sort_idx:
-		if distances[idx] <= threshold:
-			return idx
-		else:
-			return UNK_ID
-	'''
 
 def main():
 
