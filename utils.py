@@ -315,6 +315,15 @@ def weighted_draw(vals):
 	probs = softmax(vals)
 	return np.random.choice(len(vals),1,p=probs)[0]
 
+def top_k_weighted_draw(vals,k):
+	top_k_val_indices = np.argpartition(vals, -k)[-k:]
+	top_k_logits = vals[top_k_val_indices]
+	top_k_probs = softmax(top_k_logits)
+
+	output = np.random.choice(len(top_k_probs),1,p=top_k_probs)[0]
+
+	return top_k_val_indices[output]
+
 
 def softmax(x):
 
