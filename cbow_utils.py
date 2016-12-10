@@ -1,136 +1,143 @@
 import os, re, sys
 import numpy as np
 import pickle
+import modified_utils
+
 
 def read_data(data_dir, subset=None):
 
-	#list all the text files in data_dir
-	for f in os.listdir(data_dir):
-
-		#all the scraped xml files end with .txt
-		if f.endswith('.txt'):
-
-			#this gives us the option of processing just certain movie titles at a time
-			if (subset is not None and f in subset) or (subset is None):
-
-				with open(data_dir+f, 'rb') as movie:
-
-					yield f, clean_str(movie.read().lower())
+	return modified_utils.read_data(data_dir, subset)
 
 
 def clean_str(string):
 
-	'''
-	The data is already cleaned quite well - but for our purposes we will need to replace times, dates and numbers
-	'''
+	return modified_utils.clean_str(string)
 
-	#throw out - and other chars
-	char_reg = r'[- \] \[ ]'
-	string = re.sub(char_reg, ' ', string)
-
-	#replace time formatting with _TIME_
-	string = re.sub(r'[0-9]+ : [0-9]+ [a p]. m.', '_TIME_', string)
-
-	#replace dates with _DATE_
-	date_reg = r'(january|february|march|april|may|june|july|august|september|october|november|december) [0-9]{2} ,? [0-9]{0,4}'
-	string = re.sub(date_reg, ' _DATE_', string)
-
-	#replace dollar amounts with $__
-	money_reg = r'\$[0-9]+ . [0-9]+'
-	string = re.sub(money_reg, ' $__', string)
-
-	#replace numbers with _NUM_ - allow spaces around regex so that there is room for tokens like 50s don't get abstracted
-	num_reg = r'( [0-9]+)+'
-	string = re.sub(num_reg, ' _NUM_', string)
-
-	return string
-
-def corpus_to_sentences(data_dir, subset=None):
-
-	titles = []
-	corpus = []
-	data_iter = read_data(data_dir, subset)
-
-	for movie in data_iter:
-
-		titles.append(movie[0])
-
-		transcript = movie[1].splitlines()
-
-		#for each movie, corpus contains 
-		corpus.append(transcript)
-
-	return titles, corpus
 
 def shuffled_train_dev_split(data_dir, train_split, dev_split):
 
-	movies = []
-	for f in os.listdir(data_dir):
-		if f.endswith('.txt'):
-			movies.append(f)
-	movies = np.array(movies)
+	return modified_utils.shuffled_train_dev_split(data_dir, train_split, dev_split)
 
-	num_movies = len(movies)
 
-	#shuffle!
-	np.random.seed(0)
-	shuffled_idx = np.random.permutation(len(movies))
-	movies = movies[shuffled_idx]
+def create_cbow_data_files(input_dir, output_dir, train_split, dev_split, vocab_path, do_split=True):
 
-	dev_idx = int(np.floor(train_split*num_movies))
-	test_idx = int(np.floor((train_split+dev_split) * num_movies ) )
-
-	#shuffled train test split by movie
-	return movies[:dev_idx], movies[dev_idx:test_idx], movies[test_idx:] 
-
-def create_cbow_data_files(input_dir, output_dir, train_split, dev_split, vocab_path):
 
 	train_files, dev_files, test_files = shuffled_train_dev_split(input_dir, train_split, dev_split)
-	cbow_files = list(train_files)+list(dev_files)
 
-	vocabulary = pickle.load(open(vocab_path+'vocab.p',"rb"))
-	rev_vocabulary = pickle.load(open(vocab_path+'rev_vocab.p',"rb"))
-
+	#this should be the vocabulary with all the new UNKs
+	vocabulary = pickle.load(open(vocab_path+'vocab.p','rb'))
+	rev_vocabulary = pickle.load(open(vocab_path+'rev_vocab.p','rb'))
 	vocab_size = len(vocabulary)
 
-	titles, corpus = corpus_to_sentences(input_dir)
+	#if you want to train the CBOW model
+	if do_split:
 
-	#write train files
-	with open(output_dir+"cbow_"+str(vocab_size)+".example",'wb') as example_f:
-		with open(output_dir+"cbow_"+str(vocab_size)+".label",'wb') as label_f:
-			for f in cbow_files:
-				#find index of movie in titles
-				for i in range(len(titles)):
-					if titles[i] == f:
-						break
+		print 'Processing TRAIN files'
+		train_output_filepath = output_dir+'cbow_TRAIN_'+str(vocab_size)+'.data'
+		write_cbow_data(train_output_filepath,train_files,input_dir,vocabulary)
 
-				movie_text = corpus[i]
+		print 'Processing DEV files'
+		dev_output_filepath = output_dir+'cbow_DEV_'+str(vocab_size)+'.data'
+		write_cbow_data(dev_output_filepath,dev_files,input_dir,vocabulary)
 
-				#iterate through each sentence
-				for s in movie_text:
-					sentence = s.strip().split(" ")
-					index = 0
-					count = 0
-					#until we get a word in vocab that is not a special token (indexes 0-3)
-					while index < 4 and count < 5: #stop loop once we try 5 times
-						random_word = np.random.randint(len(sentence))
-						index = vocabulary.get(sentence[random_word],0)
-						count += 1
+	else:
+
+		print 'Processing TRAIN+DEV files'
+		output_filepath = output_dir+'cbow_data_'+str(vocab_size)+'.data'
+		cbow_files = train_files + dev_files
+
+		write_cbow_data(output_filepath,cbow_files,input_dir,vocabulary)
+
+
+
+def write_cbow_data_for_supervised(filepath, files_list, input_dir, vocabulary):
+
+	with open(filepath, 'wb') as data_file:
+			
+		for f in files_list:
+
+			print f
+
+			with open(input_dir+f, 'rb') as current_movie_file:
+				current_movie = current_movie_file.read().splitlines()
+
+			for line in current_movie:
+
+				sentence = line.split()
+
+				if len(sentence) > 0:
+
+					vocab_index = 0
+					num_attempts = 0
+
+					#try until we get a word in vocab that is not a special token (index 0 - 6)
+					while vocab_index < 7 and num_attempts < 5:
+
+						#pick a random word in the sentence
+						random_word_index = np.random.randint(len(sentence))
+						random_word = sentence[random_word_index]
+
+						#make sure the random word is not something that would get tagged as proper noun
+						#so it should not be an upper case word in the middle of the sentence
+						if random_word[0].isupper() and random_word_index != 0:
+							vocab_index = 0
+
+						else:
+							#get the index of that word in the vocabulary - set to 0=UNK if it's not in the vocabulary
+							#make sure to lower case just in case... 
+							vocab_index = vocabulary.get(random_word.lower(),0)
+
+						num_attempts += 1
 
 					#if we successfully picked a word in the vocabulary in 5 tries
-					if index >= 4:
-						new_sentence = sentence[:random_word]+sentence[random_word+1:]
-						#write the first line to the example file
-						for i,w in enumerate(new_sentence):
-							if i < len(new_sentence)-1:
-								example_f.write(str(w)+" ")
-							else:
-								example_f.write(str(w)+'\n')
+					if vocab_index >= 7:
 
-						label_f.write(str(index)+'\n')
+						new_sentence = sentence[:random_word_index] + sentence[random_word_index+1:]
+
+						#let the labels be the indices in the vocabulary... this will be easier later on at training
+						data_file.write(' '.join(word for word in new_sentence) + ' __label__' + str(vocab_index) + '\n' )
+
+
+def write_cbow_data_for_unsupervised(filepath, files_list, input_dir, vocabulary):
+
+	'''if we ever want to learn just word representations, 
+	this is the data format we will need, adjusting for proper noun UNKS'''
+
+	with open(filepath, 'wb') as data_file:
+
+		for f in files_list:
+
+			with open(input_dir+f, 'rb') as current_movie_file:
+				current_movie = current_movie_file.read().splitlines()
+
+			for line in current_movie:
+
+				if len(line) > 0:
+
+					sentence = modified_utils.combine_adjacent_uppers(line.split())
+					unked_sentence = ['__PROPER_NOUN_UNK__' if token[0].isupper() else token.lower() for token in sentence]
+					data_file.write(' '.join(token for token in unked_sentence))
+
 
 def main():
-	create_cbow_data_files("data/processed_en/","data/cbow_data/",.8,.1,"data/data_idx_files/2nd_run_100000/")
+	
+	'''
+	#first create the vocabulary with 100k vocabulary for special vocabulary
+	vocabulary, rev_vocabulary = modified_utils.get_vocabulary(100000, 'corpus_token_counts.p')
+
+	with open('./data/cbow_data_100000/vocab.p', 'wb') as vocab_pickle:
+		pickle.dump(vocabulary, vocab_pickle)
+	with open('./data/cbow_data_100000/rev_vocab.p', 'wb') as rev_vocab_pickle:
+		pickle.dump(rev_vocabulary, rev_vocab_pickle)
+	'''
+
+	input_dir = './data/processed_en/'
+	output_dir='./data/cbow_data_100000/'
+	train_split = 0.8
+	dev_split = 0.1
+	vocab_path = output_dir
+	create_cbow_data_files(input_dir,output_dir,train_split,dev_split,vocab_path,do_split=True)
+
 
 if __name__ == '__main__':
 

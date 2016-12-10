@@ -90,7 +90,7 @@ def get_vocabulary(vocab_size, path_to_counts_pickle):
 	return vocabulary, rev_vocabulary
 
 
-def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split, vocab_size, cbow=False):
+def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split, vocab_size, cbow=None, cbow_replace_prob=1):
 
 
 	train_files, dev_files, test_files = shuffled_train_dev_split(input_dir, train_split, dev_split)
@@ -121,7 +121,7 @@ def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split, v
 						current_line = current_movie[line_idx]
 						next_line = current_movie[line_idx+1]
 
-						current_idx, next_idx = pairs_to_idx(current_line, next_line, vocabulary, cbow=False)
+						current_idx, next_idx = pairs_to_idx(current_line, next_line, vocabulary, cbow, replace_prob=cbow_replace_prob)
 
 						example_file.write(' '.join(str(i) for i in current_idx) + '\n')
 						label_file.write(' '.join(str(i) for i in next_idx) + '\n')
@@ -153,7 +153,7 @@ def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split, v
 						current_line = current_movie[line_idx]
 						next_line = current_movie[line_idx+1]
 
-						current_idx, next_idx = pairs_to_idx(current_line, next_line, vocabulary, cbow=False)
+						current_idx, next_idx = pairs_to_idx(current_line, next_line, vocabulary, cbow, replace_prob=cbow_replace_prob)
 
 						example_file.write(' '.join(str(i) for i in current_idx) + '\n')
 						label_file.write(' '.join(str(i) for i in next_idx) + '\n')
@@ -186,7 +186,7 @@ def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split, v
 						current_line = current_movie[line_idx]
 						next_line = current_movie[line_idx+1]
 
-						current_idx, next_idx = pairs_to_idx(current_line, next_line, vocabulary, cbow=False)
+						current_idx, next_idx = pairs_to_idx(current_line, next_line, vocabulary, cbow, replace_prob=cbow_replace_prob)
 
 						example_file.write(' '.join(str(i) for i in current_idx) + '\n')
 						label_file.write(' '.join(str(i) for i in next_idx) + '\n')
@@ -203,23 +203,30 @@ def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split, v
 	print 'Done!'
 
 
-def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=False):
+def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 
-	unk_assignments = {}
+	special_unk_assignments = {}
 
+	sentence1 = sentence1.strip().split()
+	sentence2 = sentence2.strip().split()
+
+	#manually lower the first word in sentence1 and sentence2 so it won't get picked up by unk
+	sentence1[0] = sentence1[0].lower()
+	sentence2[0] = sentence2[0].lower()
+
+	#combine adjoining tokens/words which start with upper case letters into a single token
 	tokens1 = combine_adjacent_uppers( sentence1.strip().split() )
 	tokens2 = combine_adjacent_uppers( sentence2.strip().split() )
 
-	#manually lowercase the first word in tokens1 so it won't get picked up by unk
-	#don't bother with tokens2 since tokens1 determines the special unks
-	tokens1[0] = tokens1[0].lower()
+	#set default vals for the idx lists
+	sentence_idx1 = [-1]*len(tokens1)
+	sentence_idx2 = [-1]*len(tokens2)
 
-	idx1 = []
-	idx2 = []
 
-	for token in tokens1:
+	#first set up the special unk correspondences
+	for idx, token in enumerate(tokens1):
 
-		#if the first token is upper, then we might either tag it with an existing UNK or give it a new unk
+		#if the first token is upper, then we might either tag it with an existing UNK or give it a new UNK
 		if token[0].isupper():
 
 			#this means unk tokens have already begun to be assigned
@@ -227,20 +234,11 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=False):
 
 				#first check if it matches a previous UNK
 				if token in unk_assignments:
-					idx1.append( unk_assignments[token] )
+					sentence_idx1[idx] = unk_assignments[token] 
 
-
-				#otherwise, if you have already run out of special unks, default to the usual method
-				elif max(unk_assignments.values()) == CAPS_UNK_ID_3:
-
-					#split them back up!
-					temp_tokens = token.lower().split()
-					for temp_token in temp_tokens:
-						idx1.append( token_to_idx(temp_token, vocabulary, cbow) )
-
-
-				#otherwise, let the current token be a new special unk token
-				else:
+				#otherwise, check if you haven't run out of special unks
+				#if you haven't, let the current token be a new special unk token
+				elif max(unk_assignments.values()) != CAPS_UNK_ID_3:
 
 					#set the current unk token
 					curr_unk_token = max(unk_assignments.values()) + 1
@@ -249,7 +247,8 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=False):
 					unk_assignments[token] = curr_unk_token
 
 					#update the idx list
-					idx1.append( curr_unk_token )
+					sentence_idx1[idx] = curr_unk_token
+
 
 			#if no unk tokens have been assigned yet
 			else:
@@ -261,30 +260,121 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=False):
 				unk_assignments[token] = curr_unk_token
 
 				#update the idx list
-				idx1.append( curr_unk_token )
+				sentence_idx1[idx] = curr_unk_token
 
-		#if the current token is fully lowercase, do the usual method
-		else:
+	#now modify sentence_idx2 according to the special unks from sentence_idx1
+	for idx, token in enumerate(tokens2):
+		if token in unk_assignments:
+			sentence_idx2[idx] = unk_assignments[token]
 
-			#note this does not implement edit threshold - and lowercase it!
-			idx1.append( token_to_idx(token.lower(), vocabulary, cbow) )
+	#if no cbow model is provided, convert remaining things to IDX as usual
+	if cbow is None:
+
+		for idx, vocab_idx in enumerate(sentence_idx1):
+			if vocab_idx == -1:
+				sentence_idx1[idx] = token_to_idx(tokens1[idx], vocabulary)
+
+		for idx, vocab_idx in enumerate(sentence_idx2):
+			if vocab_idx == -1:
+				sentence_idx2[idx] = token_to_idx(tokens2[idx], vocabulary)
 
 
-	#now process the second sentence
-	for token in tokens2:
+	#do cbow handling... 
+	else:
 
-		try:
-			idx2.append( unk_assignments[token] )
+		#now cast remaining sentence1 tokens to idx, keeping track of the cbow guesses
+		cbow_guesses = {}
+		cbow_not_guessing = []
 
-		#raised if the current token is not in the unk assignments dictionary
-		except KeyError:
+		#first replace everything that you can with words in the vocabulary for sentence1
+		for i, vocab_idx in enumerate(sentence_idx1):
 
-			#it's possible this is a combination of a bunch of tokens
-			temp_tokens = token.lower().split()
-			for temp_token in temp_tokens:
-				idx2.append( token_to_idx(temp_token, vocabulary, cbow) )
+			#if it's -1 it needs to be updated
+			if vocab_idx == -1:
 
-	return idx1, idx2
+				try:
+					new_vocab_idx = vocabulary[ tokens1[vocab_idx] ]
+					sentence_idx1[i] = new_vocab_idx
+
+				except KeyError:
+					pass
+
+		#next replace everything that you can with words in the vocabulary for sentence2
+		for i, vocab_idx in enumerate(sentence_idx2):
+
+			if vocab_idx == -1:
+
+				try:
+					new_vocab_idx = vocabulary[ tokens2[vocab_idx] ]
+					sentence_idx2[i] = new_vocab_idx
+
+				except KeyError:
+					pass
+
+		#now loop through the UNKs in sentence_idx1 and consider replacing them
+		for i, vocab_idx in enumerate(sentence_idx1):
+
+			if vocab_idx == -1:
+
+				curr_token = tokens1[i]
+
+				#see if the current word has been encountered before
+				if curr_token in cbow_not_guessing:
+					sentence_idx1[i] = vocabulary['_UNK_']
+
+				elif curr_token in cbow_guesses:
+					sentence_idx1[i] = cbow_guesses[curr_token]
+
+				else:
+
+					#get the bag of words, as big as you can
+					current_bag = [tokens1[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx1)]
+					bag_string = ' '.join(token.lower() for token in current_bag)
+					unk_pred = model.predict([bag_string])
+
+					#do a weighted flip for whether to keep the guess or not
+					if weighted_flip(replace_prob):
+
+						cbow_guesses[ curr_token ] = unk_pred
+						sentence_idx1[i] = vocabulary[unk_pred]
+
+					else:
+
+						cbow_not_guessing.append( tokens1[i] )
+						sentence_idx1[i] = vocabulary['_UNK_']
+
+
+		#now loop through the UNKs in sentence_idx2 and consider replacing them
+		for i, vocab_idx in enumerate(sentence_idx2):
+
+			if vocab_idx == -2:
+
+				curr_token = tokens2[i]
+
+				#see if the current token has been encountered before
+				if curr_token in cbow_not_guessing:
+					sentence_idx2[i] = vocabulary['__UNK__']
+
+				elif curr_token in cbow_guesses:
+					sentence_idx2[i] = cbow_guesses[curr_token]
+
+				else:
+
+					#get the bag of words, as big as you can
+					current_bag = [tokens2[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx2)]
+					bag_string = ' '.join(token.lower() for token in current_bag)
+					unk_pred = model.predict([bag_string])
+
+					#do a weighted flip for whether to keep the guess or not
+					if weighted_flip(replace_prob):
+
+						cbow_guesses[ curr_token ] = unk_pred
+						sentence_idx2[i] = vocabulary[unk_pred]
+
+					else:
+
+						cbow_not_guessing.append( tokens2[i] )
+						sentence_idx2[i] = vocabulary['_UNK_']
 
 
 def combine_adjacent_uppers(tokens):
@@ -322,15 +412,40 @@ def combine_adjacent_uppers(tokens):
 	return new_tokens
 
 
-def token_to_idx(token, vocabulary, cbow=False):
+def token_to_idx(token, vocabulary):
 
 	try:
 		return vocabulary[token]
 	except KeyError:
-		if cbow is False:
-			return vocabulary['_UNK_']
-		else:
-			return None
+		return vocabulary['_UNK_']
+
+
+def get_cbow_guesses(tokens, model, replace_prob=1):
+
+	for idx, token in enumerate(tokens):
+
+		#if the token is UNK we consider replacing it
+		if token == UNK_ID:
+			
+			#take as much info as you can from the current bag and use it for the prediction
+			current_bag = [token for token in tokens if token > CAPS_UNK_ID_3]
+			bag_string = ' '.join(str(token) for token in tokens)
+			unk_pred = model.predict([bag_string])
+
+			#do a weighted flip for whether to keep the guess or not
+			if weighted_flip(replace_prob):
+				tokens = tokens[:idx] + unk_pred + tokens[idx+1:]
+
+	return tokens
+
+
+
+def weighted_flip(prob):
+
+	'''prob is the probability that it will return True'''
+
+	return True if np.random.uniform() <= prob else False
+
 
 def main():
 
