@@ -262,6 +262,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 				#update the idx list
 				sentence_idx1[idx] = curr_unk_token
 
+
 	#now modify sentence_idx2 according to the special unks from sentence_idx1
 	for idx, token in enumerate(tokens2):
 		if token in unk_assignments:
@@ -327,54 +328,56 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 
 				else:
 
-					#get the bag of words, as big as you can
-					current_bag = [tokens1[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx1)]
-					bag_string = ' '.join(token.lower() for token in current_bag)
-					unk_pred = model.predict([bag_string])
-
 					#do a weighted flip for whether to keep the guess or not
 					if weighted_flip(replace_prob):
+
+						#get the bag of words, as big as you can
+						current_bag = [tokens1[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx1)]
+						bag_string = ' '.join(token.lower() for token in current_bag)
+						unk_pred = model.predict([bag_string])
 
 						cbow_guesses[ curr_token ] = unk_pred
 						sentence_idx1[i] = vocabulary[unk_pred]
 
 					else:
 
-						cbow_not_guessing.append( tokens1[i] )
+						cbow_not_guessing.append( curr_token )
 						sentence_idx1[i] = vocabulary['_UNK_']
 
 
 		#now loop through the UNKs in sentence_idx2 and consider replacing them
 		for i, vocab_idx in enumerate(sentence_idx2):
 
-			if vocab_idx == -2:
+			if vocab_idx == -1:
 
 				curr_token = tokens2[i]
 
 				#see if the current token has been encountered before
 				if curr_token in cbow_not_guessing:
-					sentence_idx2[i] = vocabulary['__UNK__']
+					sentence_idx2[i] = vocabulary['_UNK_']
 
 				elif curr_token in cbow_guesses:
-					sentence_idx2[i] = cbow_guesses[curr_token]
+					sentence_idx2[i] = vocabulary[cbow_guesses[curr_token]]
 
 				else:
 
-					#get the bag of words, as big as you can
-					current_bag = [tokens2[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx2)]
-					bag_string = ' '.join(token.lower() for token in current_bag)
-					unk_pred = model.predict([bag_string])
-
 					#do a weighted flip for whether to keep the guess or not
 					if weighted_flip(replace_prob):
+
+						#get the bag of words, as big as you can
+						current_bag = [tokens2[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx2)]
+						bag_string = ' '.join(token.lower() for token in current_bag)
+						unk_pred = model.predict([bag_string])
 
 						cbow_guesses[ curr_token ] = unk_pred
 						sentence_idx2[i] = vocabulary[unk_pred]
 
 					else:
 
-						cbow_not_guessing.append( tokens2[i] )
+						cbow_not_guessing.append( curr_token )
 						sentence_idx2[i] = vocabulary['_UNK_']
+
+	return sentence_idx1, sentence_idx2
 
 
 def combine_adjacent_uppers(tokens):
