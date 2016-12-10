@@ -310,19 +310,20 @@ def batch_iter(data, batch_size, num_epochs):
 		data = data[shuffled_idx]
 
 
-def weighted_draw(vals):
+def weighted_draw(vals,k=None):
 
-	probs = softmax(vals)
-	return np.random.choice(len(vals),1,p=probs)[0]
+	if k is None:
+		probs = softmax(vals)
+		return np.random.choice(len(vals),1,p=probs)[0]
+	else:
+		#do weighted draw of just the top k logits
+		top_k_val_indices = np.argpartition(vals, -k)[-k:]
+		top_k_logits = vals[top_k_val_indices]
+		top_k_probs = softmax(top_k_logits)
 
-def top_k_weighted_draw(vals,k):
-	top_k_val_indices = np.argpartition(vals, -k)[-k:]
-	top_k_logits = vals[top_k_val_indices]
-	top_k_probs = softmax(top_k_logits)
+		output = np.random.choice(len(top_k_probs),1,p=top_k_probs)[0]
 
-	output = np.random.choice(len(top_k_probs),1,p=top_k_probs)[0]
-
-	return top_k_val_indices[output]
+		return top_k_val_indices[output]
 
 
 def softmax(x):

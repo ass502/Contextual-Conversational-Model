@@ -68,7 +68,7 @@ class seq2seq_model(object):
 				num_encoder_symbols = vocab_size,
 				num_decoder_symbols = vocab_size,
 				embedding_size = size,
-				output_projection = None,
+				output_projection = output_projection,
 				feed_previous = do_decode,
 				dtype = dtype)"""
 			return tf.nn.seq2seq.embedding_rnn_seq2seq(
