@@ -20,6 +20,7 @@ tf.app.flags.DEFINE_string('simulate_file', '', 'File to read in for simulation'
 tf.app.flags.DEFINE_string('checkpoint_dir', './models/small_model/', 'Checkpoint directory.')
 tf.app.flags.DEFINE_string('vocab_dir', './data/data_idx_files/small_model_10000/', 'Checkpoint directory.')
 tf.app.flags.DEFINE_boolean('argmax_decoder', False, 'How to decode')
+tf.app.flags.DEFINE_integer('sample_k', None, 'Top k logits to sample for in sampled decoding - None samples over all words')
 tf.app.flags.DEFINE_integer('edit_threshold', None, 'Threshold for edit distance - None does not implement feature')
 
 FLAGS = tf.app.flags.FLAGS
@@ -87,8 +88,7 @@ class Chat_Session(object):
 				_, _, output_logits = self.model.step(self.sess, encoder_inputs, decoder_inputs,
 				                               target_weights, bucket_id, True)
 
-				#idx_response.append( int(np.argmax(output_logits[i],axis=1)) )
-				idx_response.append( utils.weighted_draw(output_logits[i][0]) )
+				idx_response.append( utils.weighted_draw(output_logits[i][0],FLAGS.sample_k) )
 
 		# If there is an EOS symbol in outputs, cut them at that point.
 		if utils.EOS_ID in idx_response:
