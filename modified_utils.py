@@ -332,7 +332,8 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 					if weighted_flip(replace_prob):
 
 						#get the bag of words, as big as you can
-						current_bag = [tokens1[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx1)]
+						#current_bag = [tokens1[idx] if val > CAPS_UNK_ID_3 for (idx, val) in enumerate(sentence_idx1)]
+						current_bag = [tokens1[idx] for idx, val in enumerate(sentence_idx1) if val > CAPS_UNK_ID_3]
 						bag_string = ' '.join(token.lower() for token in current_bag)
 						unk_pred = model.predict([bag_string])
 
@@ -365,7 +366,8 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 					if weighted_flip(replace_prob):
 
 						#get the bag of words, as big as you can
-						current_bag = [tokens2[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx2)]
+						#current_bag = [tokens2[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx2)]
+						current_bag = [tokens2[idx] for idx, val in enumerate(sentence_idx2) if val > CAPS_UNK_ID_3]
 						bag_string = ' '.join(token.lower() for token in current_bag)
 						unk_pred = model.predict([bag_string])
 

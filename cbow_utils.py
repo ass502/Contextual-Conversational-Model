@@ -34,11 +34,11 @@ def create_cbow_data_files(input_dir, output_dir, train_split, dev_split, vocab_
 
 		print 'Processing TRAIN files'
 		train_output_filepath = output_dir+'cbow_TRAIN_'+str(vocab_size)+'.data'
-		write_cbow_data(train_output_filepath,train_files,input_dir,vocabulary)
+		write_cbow_data_for_supervised(train_output_filepath,train_files,input_dir,vocabulary)
 
 		print 'Processing DEV files'
 		dev_output_filepath = output_dir+'cbow_DEV_'+str(vocab_size)+'.data'
-		write_cbow_data(dev_output_filepath,dev_files,input_dir,vocabulary)
+		write_cbow_data_for_supervised(dev_output_filepath,dev_files,input_dir,vocabulary)
 
 	else:
 
@@ -121,7 +121,7 @@ def write_cbow_data_for_unsupervised(filepath, files_list, input_dir, vocabulary
 
 def main():
 	
-	'''
+	
 	#first create the vocabulary with 100k vocabulary for special vocabulary
 	vocabulary, rev_vocabulary = modified_utils.get_vocabulary(100000, 'corpus_token_counts.p')
 
@@ -129,7 +129,7 @@ def main():
 		pickle.dump(vocabulary, vocab_pickle)
 	with open('./data/cbow_data_100000/rev_vocab.p', 'wb') as rev_vocab_pickle:
 		pickle.dump(rev_vocabulary, rev_vocab_pickle)
-	'''
+	
 
 	input_dir = './data/processed_en/'
 	output_dir='./data/cbow_data_100000/'
