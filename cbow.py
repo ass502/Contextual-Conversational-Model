@@ -7,7 +7,7 @@ import fasttext
 train_data_path = './data/cbow_data_100000/cbow_TRAIN_100002.data'
 dev_data_path = './data/cbow_data_100000/cbow_DEV_100002.data'
 
-classifier = fasttext.supervised(train_data_path, 'cbow_model', label_prefix='__label__')
+classifier = fasttext.supervised(train_data_path, 'cbow_model', silent=0, label_prefix='__label__')
 
 train_results = classifier.test(train_data_path)
 print 'train precision-1: ' + str(train_results.precision)

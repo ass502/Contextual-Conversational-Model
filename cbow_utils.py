@@ -95,7 +95,7 @@ def write_cbow_data_for_supervised(filepath, files_list, input_dir, vocabulary):
 						new_sentence = sentence[:random_word_index] + sentence[random_word_index+1:]
 
 						#let the labels be the indices in the vocabulary... this will be easier later on at training
-						data_file.write(' '.join(word for word in new_sentence) + ' __label__' + str(vocab_index) + '\n' )
+						data_file.write(' '.join(clean_str(word) for word in new_sentence) + ' __label__' + random_word.lower() + '\n' )
 
 
 def write_cbow_data_for_unsupervised(filepath, files_list, input_dir, vocabulary):
@@ -116,12 +116,12 @@ def write_cbow_data_for_unsupervised(filepath, files_list, input_dir, vocabulary
 
 					sentence = modified_utils.combine_adjacent_uppers(line.split())
 					unked_sentence = ['__PROPER_NOUN_UNK__' if token[0].isupper() else token.lower() for token in sentence]
-					data_file.write(' '.join(token for token in unked_sentence))
+					data_file.write(' '.join(clean_str(token) for token in unked_sentence))
 
 
 def main():
 	
-	
+	'''
 	#first create the vocabulary with 100k vocabulary for special vocabulary
 	vocabulary, rev_vocabulary = modified_utils.get_vocabulary(100000, 'corpus_token_counts.p')
 
@@ -129,7 +129,7 @@ def main():
 		pickle.dump(vocabulary, vocab_pickle)
 	with open('./data/cbow_data_100000/rev_vocab.p', 'wb') as rev_vocab_pickle:
 		pickle.dump(rev_vocabulary, rev_vocab_pickle)
-	
+	'''
 
 	input_dir = './data/processed_en/'
 	output_dir='./data/cbow_data_100000/'

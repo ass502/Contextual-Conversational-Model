@@ -335,7 +335,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 						#current_bag = [tokens1[idx] if val > CAPS_UNK_ID_3 for (idx, val) in enumerate(sentence_idx1)]
 						current_bag = [tokens1[idx] for idx, val in enumerate(sentence_idx1) if val > CAPS_UNK_ID_3]
 						bag_string = ' '.join(token.lower() for token in current_bag)
-						unk_pred = model.predict([bag_string])
+						unk_pred = model.predict([bag_string])[0][0][9:]
 
 						cbow_guesses[ curr_token ] = unk_pred
 						sentence_idx1[i] = vocabulary[unk_pred]
@@ -369,7 +369,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 						#current_bag = [tokens2[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx2)]
 						current_bag = [tokens2[idx] for idx, val in enumerate(sentence_idx2) if val > CAPS_UNK_ID_3]
 						bag_string = ' '.join(token.lower() for token in current_bag)
-						unk_pred = model.predict([bag_string])
+						unk_pred = model.predict([bag_string])[0][0][9:]
 
 						cbow_guesses[ curr_token ] = unk_pred
 						sentence_idx2[i] = vocabulary[unk_pred]
@@ -443,6 +443,108 @@ def get_cbow_guesses(tokens, model, replace_prob=1):
 
 	return tokens
 
+
+def sentence_to_idx(sentence, vocabulary, cbow_model=None, replace_prob=1):
+
+	'''
+	cbow_model should be the fasttext model object
+	By default, this implements proper noun UNKs
+	It only implements the cbow substitution if cbow_model is not None
+	'''
+
+	tokens = combine_adjacent_uppers(sentence.strip().split())
+	idx_tokens = [-1]*len(tokens)
+
+	special_unk_assignments = {}
+
+	for i, token in enumerate(tokens):
+
+		if token[0].isupper() and i != 0:
+
+			#if no special unk tokens have been assigned yet
+			if len(special_unk_assignments) == 0:
+
+				#set current unk token
+				curr_unk_token = _CAPS_UNK_ID_1_
+
+				#update unks dict
+				special_unk_assignments[token] = curr_unk_token
+
+				#record token with idx value
+				idx_tokens[i] = curr_unk_token
+
+			#otherwise, if the token matches a previous assigned UNK
+			elif token in special_unk_assignments:
+
+				idx_tokens[i] = special_unk_assignments[token]
+
+			#if all the special unk tokens have been used up
+			elif len(special_unk_assignments) == 3:
+
+				idx_tokens[i] = vocabulary['_UNK_']
+
+			#finally, if none of the above, create a new special unk token
+			else:
+
+				#set the current unk token
+				curr_unk_token = max(special_unk_assignments.values())+1
+
+				#update unks dict
+				special_unk_assignments[token] = curr_unk_token
+
+				#record token with idx value
+				idx_tokens[i] = curr_unk_token
+
+		#if it's not capitalized, pass it through the normal vocab
+		else:
+
+			try:
+				#try and replace the word with an index from the vocabulary
+				new_token = vocabulary[token]
+				idx_tokens[i] = new_token
+
+			except KeyError:
+				
+				#if not cbow guessing, replace with an UNK. otherwise skip
+				if cbow is None:
+					idx_tokens[i] = UNK_ID
+				else:
+					pass
+
+		cbow_guesses = {}
+		cbow_not_guessing = []
+		
+		#if cbow is not none, then there will be -1 values left. we need to guess what they should be. 
+		if cbow is not None:
+
+			for i, idx_value in enumerate(idx_tokens):
+
+				if idx_value == -1:
+
+					curr_token = tokens[i]
+
+					if curr_token in cbow_not_guessing:
+						idx_tokens[i] = vocabulary['_UNK_']
+
+					elif curr_token in cbow_guesses:
+						idx_tokens[i] = vocabulary[cbow_guesses[curr_token]]
+
+					elif weighted_flip(replace_prob):
+
+						current_bag = [tokens[idx] for idx, val in enumerate(idx_tokens) if val > CAPS_UNK_ID_3]
+						
+						current_bag_string = ' '.join(token in current_bag)
+						unk_pred = model.predict([bag_string])[0][0][9:]
+
+						#change the idx value and update the guesses dictionary
+						idx_tokens[i] = vocabulary[unk_pred]
+						cbow_guesses[curr_token] = unk_pred
+
+					else:
+						idx_tokens[i] = vocabulary['_UNK_']
+						cbow_not_guessing.append(curr_token)
+
+	return idx_tokens, special_unk_assignments, cbow_guesses
 
 
 def weighted_flip(prob):
