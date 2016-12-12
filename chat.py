@@ -55,7 +55,10 @@ class Chat_Session_UNKS(object):
 		self.buckets = train._buckets
 
 		#open the CBOW model
-		self.cbow_model = fasttext.load_model(FLAGS.cbow_model, label_prefix='__LABEL__')
+		if len(FLAGS.cbow_model) > 0:
+			self.cbow_model = fasttext.load_model(FLAGS.cbow_model, label_prefix='__LABEL__')
+		else:
+			self.cbow_model = None
 
 		#store the special unk chars in the model
 		self.special_unk_idxes = [modified_utils.CAPS_UNK_ID_1, modified_utils.CAPS_UNK_ID_2, modified_utils.CAPS_UNK_ID_3]
@@ -388,7 +391,12 @@ def main():
 	
 		vocabulary = './'
 		reverse_vocabulary = './'
-		chat_session = Chat_Session(sess, vocabulary, reverse_vocabulary)
+
+		#load up the appropriate chat session object
+		if FLAGS.special_unks:
+			chat_session = Chat_Session_UNKS(sess, vocabulary, reverse_vocabulary)
+		else:
+			chat_session = Chat_Session(sess, vocabulary, reverse_vocabulary)
 		
 		if len(FLAGS.simulate_file):
 			

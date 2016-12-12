@@ -1,3 +1,4 @@
+import numpy as np
 import pickle
 import utils
 import sys
@@ -425,25 +426,6 @@ def token_to_idx(token, vocabulary):
 		return vocabulary['_UNK_']
 
 
-def get_cbow_guesses(tokens, model, replace_prob=1):
-
-	for idx, token in enumerate(tokens):
-
-		#if the token is UNK we consider replacing it
-		if token == UNK_ID:
-			
-			#take as much info as you can from the current bag and use it for the prediction
-			current_bag = [token for token in tokens if token > CAPS_UNK_ID_3]
-			bag_string = ' '.join(str(token) for token in tokens)
-			unk_pred = model.predict([bag_string])
-
-			#do a weighted flip for whether to keep the guess or not
-			if weighted_flip(replace_prob):
-				tokens = tokens[:idx] + unk_pred + tokens[idx+1:]
-
-	return tokens
-
-
 def sentence_to_idx(sentence, vocabulary, cbow_model=None, replace_prob=1):
 
 	'''
@@ -556,12 +538,12 @@ def weighted_flip(prob):
 
 def main():
 
-	'''
+	
 	input_directory = './data/processed_en/'
 	output_directory = './data/data_idx_files/small_model_10000_unks/'
 	create_train_dev_test_files(input_directory, output_directory, train_split=0.8, dev_split=0.1, vocab_size=10000)
+	
 	'''
-
 	#how often does this proper noun use case occur
 	with open('./data/data_idx_files/small_model_10000_unks/train_10000.example', 'rb') as example_file:
 		with open('./data/data_idx_files/small_model_10000_unks/train_10000.label', 'rb') as label_file:
@@ -586,6 +568,7 @@ def main():
 
 	print count
 	print len(examples)
+	'''
 
 if __name__ == '__main__':
 
