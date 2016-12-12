@@ -71,7 +71,7 @@ def get_vocabulary(vocab_size, path_to_counts_pickle):
 	corpus_counts = pickle.load(open(path_to_counts_pickle, 'rb'))
 
 	#get the most common tokens in the corpus - subtract 4 for tokens below
-	most_common_tokens = corpus_counts.most_common(vocab_size-5)
+	most_common_tokens = corpus_counts.most_common(vocab_size-7)
 
 	#by default every vocabulary needs special tokens for unknown words, padding, end of sentence, start for decoder
 	vocabulary = { '_UNK_': UNK_ID, '_PAD_': PAD_ID, '_EOS_': EOS_ID, '_GO_': GO_ID, '_CAPS_UNK_ID_1_': CAPS_UNK_ID_1, 
