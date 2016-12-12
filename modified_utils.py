@@ -206,7 +206,7 @@ def create_train_dev_test_files(input_dir, output_dir, train_split, dev_split, v
 
 def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 
-	special_unk_assignments = {}
+	unk_assignments = {}
 
 	sentence1 = sentence1.strip().split()
 	sentence2 = sentence2.strip().split()
@@ -216,13 +216,12 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 	sentence2[0] = sentence2[0].lower()
 
 	#combine adjoining tokens/words which start with upper case letters into a single token
-	tokens1 = combine_adjacent_uppers( sentence1.strip().split() )
-	tokens2 = combine_adjacent_uppers( sentence2.strip().split() )
+	tokens1 = combine_adjacent_uppers( sentence1 )
+	tokens2 = combine_adjacent_uppers( sentence2 )
 
 	#set default vals for the idx lists
 	sentence_idx1 = [-1]*len(tokens1)
 	sentence_idx2 = [-1]*len(tokens2)
-
 
 	#first set up the special unk correspondences
 	for idx, token in enumerate(tokens1):
