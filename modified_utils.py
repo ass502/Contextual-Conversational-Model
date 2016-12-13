@@ -1,4 +1,5 @@
 import numpy as np
+import fasttext
 import pickle
 import utils
 import sys
@@ -208,6 +209,11 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 
 	unk_assignments = {}
 
+	if sentence1[:1]=='-':
+		sentence1=sentence1[1:]
+	if sentence2[:1]=='-':
+		sentence2=sentence2[1:]
+
 	sentence1 = sentence1.strip().split()
 	sentence2 = sentence2.strip().split()
 
@@ -227,7 +233,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 	for idx, token in enumerate(tokens1):
 
 		#if the first token is upper, then we might either tag it with an existing UNK or give it a new UNK
-		if token[0].isupper():
+		if token[0].isupper() and token[0] != 'I':
 
 			#this means unk tokens have already begun to be assigned
 			if len(unk_assignments) != 0:
@@ -294,7 +300,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 			if vocab_idx == -1:
 
 				try:
-					new_vocab_idx = vocabulary[ tokens1[vocab_idx] ]
+					new_vocab_idx = vocabulary[ tokens1[i] ]
 					sentence_idx1[i] = new_vocab_idx
 
 				except KeyError:
@@ -306,7 +312,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 			if vocab_idx == -1:
 
 				try:
-					new_vocab_idx = vocabulary[ tokens2[vocab_idx] ]
+					new_vocab_idx = vocabulary[ tokens2[i] ]
 					sentence_idx2[i] = new_vocab_idx
 
 				except KeyError:
@@ -335,10 +341,13 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 						#current_bag = [tokens1[idx] if val > CAPS_UNK_ID_3 for (idx, val) in enumerate(sentence_idx1)]
 						current_bag = [tokens1[idx] for idx, val in enumerate(sentence_idx1) if val > CAPS_UNK_ID_3]
 						bag_string = ' '.join(token.lower() for token in current_bag)
-						unk_pred = model.predict([bag_string])[0][0][9:]
+						unk_pred = cbow.predict([bag_string])[0][0]
 
 						cbow_guesses[ curr_token ] = unk_pred
-						sentence_idx1[i] = vocabulary[unk_pred]
+						try:
+							sentence_idx1[i] = vocabulary[unk_pred]
+						except KeyError:
+							sentence_idx1[i] = vocabulary['_UNK_']
 
 					else:
 
@@ -369,10 +378,13 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 						#current_bag = [tokens2[idx] if val > CAPS_UNK_ID_3 for idx, val in enumerate(sentence_idx2)]
 						current_bag = [tokens2[idx] for idx, val in enumerate(sentence_idx2) if val > CAPS_UNK_ID_3]
 						bag_string = ' '.join(token.lower() for token in current_bag)
-						unk_pred = model.predict([bag_string])[0][0][9:]
+						unk_pred = cbow.predict([bag_string])[0][0]
 
 						cbow_guesses[ curr_token ] = unk_pred
-						sentence_idx2[i] = vocabulary[unk_pred]
+						try:
+							sentence_idx2[i] = vocabulary[unk_pred]
+						except KeyError:
+							sentence_idx2[i] = vocabulary['_UNK_']
 
 					else:
 
@@ -535,13 +547,63 @@ def weighted_flip(prob):
 	return True if np.random.uniform() <= prob else False
 
 
+def test():
+
+	input_directory = './data/processed_en/'
+	
+	train_files, dev_files, test_files = shuffled_train_dev_split(input_directory, 0.8, 0.1)
+	vocabulary, rev_vocabulary = get_vocabulary(10000, 'corpus_token_counts.p')
+
+	c = fasttext.load_model('cbow_model.bin', label_prefix='__label__')
+
+	for train_file_path in train_files:
+
+		with open(input_directory+train_file_path, 'rb') as train_file:
+	
+			data = train_file.read().splitlines()
+
+			for line_idx in range(len(data)):
+
+				try:
+
+					tokens1 = data[line_idx]
+					tokens2 = data[line_idx+1]
+
+					print '\nSENTENCES: '
+					print tokens1
+					print tokens2
+
+					idx1, idx2 = pairs_to_idx(tokens1, tokens2, vocabulary, cbow=c)
+					
+					#print '\nPAIRS TO IDX RESULT: '
+					#print idx1
+					#print idx2
+					
+					print 'IN ENGLISH: '
+					print ' '.join(rev_vocabulary[i] for i in idx1)
+					print ' '.join(rev_vocabulary[i] for i in idx2)
+
+					if line_idx == 20:
+						sys.exit()
+
+				except IndexError:
+					pass
+
+
 def main():
 
-	
+	test()
+
+
+	'''
 	input_directory = './data/processed_en/'
-	output_directory = './data/data_idx_files/small_model_10000_unks/'
-	create_train_dev_test_files(input_directory, output_directory, train_split=0.8, dev_split=0.1, vocab_size=10000)
-	
+	output_directory = './data/data_idx_files/small_model_10000_unks_cbow/'
+	cbow_model_path = 'cbow_model.bin'
+
+	c = fasttext.load_model(cbow_model_path, label_prefix='__label__')
+	create_train_dev_test_files(input_directory, output_directory, train_split=0.8, dev_split=0.1, vocab_size=10000, cbow=c)
+	'''
+
 	'''
 	#how often does this proper noun use case occur
 	with open('./data/data_idx_files/small_model_10000_unks/train_10000.example', 'rb') as example_file:
