@@ -214,8 +214,8 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 	if sentence2[:1]=='-':
 		sentence2=sentence2[1:]
 
-	sentence1 = sentence1.strip().split()
-	sentence2 = sentence2.strip().split()
+	sentence1 = utils.clean_str(sentence1).strip().split()
+	sentence2 = utils.clean_str(sentence2).strip().split()
 
 	#manually lower the first word in sentence1 and sentence2 so it won't get picked up by unk
 	sentence1[0] = sentence1[0].lower()
@@ -274,20 +274,8 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 		if token in unk_assignments:
 			sentence_idx2[idx] = unk_assignments[token]
 
-	#if no cbow model is provided, convert remaining things to IDX as usual
-	if cbow is None:
-
-		for idx, vocab_idx in enumerate(sentence_idx1):
-			if vocab_idx == -1:
-				sentence_idx1[idx] = token_to_idx(tokens1[idx], vocabulary)
-
-		for idx, vocab_idx in enumerate(sentence_idx2):
-			if vocab_idx == -1:
-				sentence_idx2[idx] = token_to_idx(tokens2[idx], vocabulary)
-
-
 	#do cbow handling... 
-	else:
+	if cbow is not None:
 
 		#now cast remaining sentence1 tokens to idx, keeping track of the cbow guesses
 		cbow_guesses = {}
@@ -296,7 +284,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 		#first replace everything that you can with words in the vocabulary for sentence1
 		for i, vocab_idx in enumerate(sentence_idx1):
 
-			#if it's -1 it needs to be updated
+			#if it's -1 it needs to be updated 
 			if vocab_idx == -1:
 
 				try:
@@ -318,10 +306,10 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 				except KeyError:
 					pass
 
-		#now loop through the UNKs in sentence_idx1 and consider replacing them
+		#now loop through the UNKs in sentence_idx1 and consider replacing them - but not the capital letter things!
 		for i, vocab_idx in enumerate(sentence_idx1):
 
-			if vocab_idx == -1:
+			if vocab_idx == -1 and tokens1[i][0].islower():
 
 				curr_token = tokens1[i]
 
@@ -358,7 +346,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 		#now loop through the UNKs in sentence_idx2 and consider replacing them
 		for i, vocab_idx in enumerate(sentence_idx2):
 
-			if vocab_idx == -1:
+			if vocab_idx == -1 and tokens2[i][0].islower():
 
 				curr_token = tokens2[i]
 
@@ -390,6 +378,15 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 
 						cbow_not_guessing.append( curr_token )
 						sentence_idx2[i] = vocabulary['_UNK_']
+
+	#if no cbow model is provided/convert remaining things to IDX as usual - this includes capitalized stuff left over from CBOW
+	for idx, vocab_idx in enumerate(sentence_idx1):
+		if vocab_idx == -1:
+			sentence_idx1[idx] = token_to_idx(tokens1[idx].lower(), vocabulary)
+
+	for idx, vocab_idx in enumerate(sentence_idx2):
+		if vocab_idx == -1:
+			sentence_idx2[idx] = token_to_idx(tokens2[idx].lower(), vocabulary)
 
 	return sentence_idx1, sentence_idx2
 
@@ -452,7 +449,7 @@ def sentence_to_idx(sentence, vocabulary, cbow_model=None, replace_prob=1):
 
 	for i, token in enumerate(tokens):
 
-		if token[0].isupper() and i != 0:
+		if token[0].isupper() and i != 0 and token != 'I':
 
 			#if no special unk tokens have been assigned yet
 			if len(special_unk_assignments) == 0:
@@ -488,7 +485,7 @@ def sentence_to_idx(sentence, vocabulary, cbow_model=None, replace_prob=1):
 				#record token with idx value
 				idx_tokens[i] = curr_unk_token
 
-		#if it's not capitalized, pass it through the normal vocab
+		#if it's not capitalized (or whatever else), pass it through the normal vocab
 		else:
 
 			try:
@@ -507,7 +504,7 @@ def sentence_to_idx(sentence, vocabulary, cbow_model=None, replace_prob=1):
 		cbow_guesses = {}
 		cbow_not_guessing = []
 		
-		#if cbow is not none, then there will be -1 values left. we need to guess what they should be. 
+		#if cbow is not none, then there will probably be -1 values left. we need to guess what they should be. 
 		if cbow is not None:
 
 			for i, idx_value in enumerate(idx_tokens):
@@ -526,8 +523,8 @@ def sentence_to_idx(sentence, vocabulary, cbow_model=None, replace_prob=1):
 
 						current_bag = [tokens[idx] for idx, val in enumerate(idx_tokens) if val > CAPS_UNK_ID_3]
 						
-						current_bag_string = ' '.join(token in current_bag)
-						unk_pred = model.predict([bag_string])[0][0][9:]
+						current_bag_string = ' '.join(token for token in current_bag)
+						unk_pred = model.predict([current_bag_string])[0][0]
 
 						#change the idx value and update the guesses dictionary
 						idx_tokens[i] = vocabulary[unk_pred]
@@ -556,6 +553,7 @@ def test():
 
 	c = fasttext.load_model('cbow_model.bin', label_prefix='__label__')
 
+	file_count = 0
 	for train_file_path in train_files:
 
 		with open(input_directory+train_file_path, 'rb') as train_file:
@@ -569,7 +567,7 @@ def test():
 					tokens1 = data[line_idx]
 					tokens2 = data[line_idx+1]
 
-					print '\nSENTENCES: '
+					print '\nORIGINAL SENTENCES: '
 					print tokens1
 					print tokens2
 
@@ -579,30 +577,32 @@ def test():
 					#print idx1
 					#print idx2
 					
-					print 'IN ENGLISH: '
+					print 'BY ENCODING: '
 					print ' '.join(rev_vocabulary[i] for i in idx1)
 					print ' '.join(rev_vocabulary[i] for i in idx2)
 
-					if line_idx == 20:
-						sys.exit()
+					if line_idx == 15:
+						break
 
 				except IndexError:
 					pass
 
+		file_count += 1
+		if file_count == 5:
+			sys.exit()
+
 
 def main():
 
-	test()
 
+	#test()
 
-	'''
 	input_directory = './data/processed_en/'
-	output_directory = './data/data_idx_files/small_model_10000_unks_cbow/'
+	output_directory = './data/data_idx_files/small_model_100000_unks/'
 	cbow_model_path = 'cbow_model.bin'
 
 	c = fasttext.load_model(cbow_model_path, label_prefix='__label__')
-	create_train_dev_test_files(input_directory, output_directory, train_split=0.8, dev_split=0.1, vocab_size=10000, cbow=c)
-	'''
+	create_train_dev_test_files(input_directory, output_directory, train_split=0.8, dev_split=0.1, vocab_size=100000, cbow=None)
 
 	'''
 	#how often does this proper noun use case occur
