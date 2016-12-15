@@ -3,6 +3,7 @@ import fasttext
 import pickle
 import utils
 import sys
+import re
 
 '''
 From utils borrow:
@@ -455,7 +456,7 @@ def sentence_to_idx(sentence, vocabulary, cbow=None, replace_prob=1):
 			if len(special_unk_assignments) == 0:
 
 				#set current unk token
-				curr_unk_token = _CAPS_UNK_ID_1_
+				curr_unk_token = CAPS_UNK_ID_1
 
 				#update unks dict
 				special_unk_assignments[token] = curr_unk_token
@@ -542,6 +543,23 @@ def weighted_flip(prob):
 	'''prob is the probability that it will return True'''
 
 	return True if np.random.uniform() <= prob else False
+
+
+def format(query):
+
+	#add a space before all apostrophes
+	query = re.sub('([\'])', r'\1 ', query)
+
+	#add a space before all the punctuation
+	query = re.sub('([.,!?():;])', r' \1', query)
+
+	#throw out extra white pace
+	query = re.sub('\s{2,}', ' ', query)
+
+	#lowercase the first letter
+	query = query[0].lower() + query[1:]
+
+	return query.strip()
 
 
 def test():

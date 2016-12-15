@@ -7,6 +7,7 @@ Then it will feed these chats into the encoder and receive one-hot encodings for
 It will print the response to the command line.
 '''
 
+import modified_utils
 import tensorflow as tf
 import numpy as np
 import train
@@ -19,9 +20,9 @@ import re
 
 tf.app.flags.DEFINE_boolean('interactive_chat', True, 'Talk to a user!')
 tf.app.flags.DEFINE_string('simulate_file', '', 'File to read in for simulation')
-tf.app.flags.DEFINE_string('checkpoint_dir', './models/small_model/', 'Checkpoint directory.')
-tf.app.flags.DEFINE_string('vocab_dir', './data/data_idx_files/small_model_10000/', 'Checkpoint directory.')
-tf.app.flags.DEFINE_boolean('argmax_decoder', False, 'How to decode')
+tf.app.flags.DEFINE_string('checkpoint_dir', './models/debug_dir_UNK/', 'Checkpoint directory.')
+tf.app.flags.DEFINE_string('vocab_dir', './data/data_idx_files/small_model_100000_unks/', 'Checkpoint directory.')
+tf.app.flags.DEFINE_boolean('argmax_decoder', True, 'How to decode')
 tf.app.flags.DEFINE_integer('sample_k', None, 'Top k logits to sample for in sampled decoding - None samples over all words')
 tf.app.flags.DEFINE_integer('edit_threshold', None, 'Threshold for edit distance - None does not implement feature')
 tf.app.flags.DEFINE_boolean('special_unks', False, 'Use special unks for decoding and training')
@@ -127,11 +128,11 @@ class Chat_Session_UNKS(object):
 		while True:
 
 			#read user query and transform it to match corpus format
-			query = utils.format( self.read_query() )
+			query = modified_utils.format( self.read_query() )
 			
 			#transform query to idx
 			idx_query, special_unk_assignments, cbow_guesses = modified_utils.sentence_to_idx(query, self.vocabulary, cbow=self.cbow_model, replace_prob=FLAGS.replace_prob)
-
+			
 			#compute response to user query
 			idx_response = self.respond(idx_query)
 
@@ -142,16 +143,16 @@ class Chat_Session_UNKS(object):
 			reversed_special_unk_assignments = {val: key for key, val in special_unk_assignments.iteritems()}
 
 			#see if any of the special_unk_assignment tokens are in the idx response
-			for i, idx in enumerate(idx_response):
+			for i, vocab_idx in enumerate(idx_response):
 				try:
-					response[i] = reversed_special_unk_assignments[idx]
+					response[i] = reversed_special_unk_assignments[vocab_idx]
 				except KeyError:
 					pass
 
 			#do normal vocabulary mapping for everything else
-			for i, idx in enumerate(idx_response):
+			for i, vocab_idx in enumerate(idx_response):
 				try:
-					response[i] = self.reverse_vocabulary[i]
+					response[i] = self.reverse_vocabulary[vocab_idx]
 				except KeyError:
 					response[i] = self.reverse_vocabulary['_UNK_']
 
@@ -241,8 +242,11 @@ class Chat_Session_UNKS(object):
 		print ('\nChat log saved to ' + filepath)
 
 
-
-
+'''
+================================================================================================================================
+	ORIGINAL CHAT CLASS BELOW
+================================================================================================================================
+'''
 class Chat_Session(object):
 
 	'''ORIGINAL CHAT CLASS: this has the default behavior, with options for greedy vs sampled decoding, and edit distance''' 
