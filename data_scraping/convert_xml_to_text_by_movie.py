@@ -8,18 +8,21 @@ sentence_count = 0
 token_count = 0
 
 #recursively walk through OpenSubtitles directory
-for root, dirs, files in os.walk('../data/en'):
+#for root, dirs, files in os.walk('../data/en'):
+for root, dirs, files in os.walk('../../Downloads/OpenSubtitles2011/xml/en'):
 	for name in files:
 		#get filename of current file
 		filename = os.path.join(root,name)
 		
 		#parse only if it is an .xml file
 		if filename[-4:] == '.xml':
+			print filename
 			#xml parser
 			document = ET.parse(filename)
 			tree = document.getroot()
 
-			with open("../data/processed_en/"+name[:-4]+".txt","wb") as out_f:
+			#with open("../data/processed_en/"+name[:-4]+".txt","wb") as out_f:
+			with open("../data/2011_processed_en/"+name[:-4]+".txt","wb") as out_f:
 
 				#each child of the document tree is a sentence
 				for c,child in enumerate(tree):
@@ -27,12 +30,15 @@ for root, dirs, files in os.walk('../data/en'):
 					for i in range(len(child)):
 						#words of sentences have a w tag, ignore other tags
 						if child[i].tag == 'w':
-							sentence += child[i].text
-							sentence += " "
+							try:
+								sentence += child[i].text
+								sentence += " "
 
-							#remove inner html tags like <i>  </i>
-							sentence = re.sub('<[^<]+?>', '', sentence)
-							token_count += 1
+								#remove inner html tags like <i>  </i>
+								sentence = re.sub('<[^<]+?>', '', sentence)
+								token_count += 1
+							except TypeError:
+								pass
 
 					try:
 						#remove space at end of sentence

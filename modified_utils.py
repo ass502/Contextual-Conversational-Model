@@ -434,7 +434,7 @@ def token_to_idx(token, vocabulary):
 		return vocabulary['_UNK_']
 
 
-def sentence_to_idx(sentence, vocabulary, cbow_model=None, replace_prob=1):
+def sentence_to_idx(sentence, vocabulary, cbow=None, replace_prob=1):
 
 	'''
 	cbow_model should be the fasttext model object
@@ -524,7 +524,7 @@ def sentence_to_idx(sentence, vocabulary, cbow_model=None, replace_prob=1):
 						current_bag = [tokens[idx] for idx, val in enumerate(idx_tokens) if val > CAPS_UNK_ID_3]
 						
 						current_bag_string = ' '.join(token for token in current_bag)
-						unk_pred = model.predict([current_bag_string])[0][0]
+						unk_pred = cbow.predict([current_bag_string])[0][0]
 
 						#change the idx value and update the guesses dictionary
 						idx_tokens[i] = vocabulary[unk_pred]

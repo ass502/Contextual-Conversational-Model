@@ -26,7 +26,7 @@ tf.app.flags.DEFINE_integer('sample_k', None, 'Top k logits to sample for in sam
 tf.app.flags.DEFINE_integer('edit_threshold', None, 'Threshold for edit distance - None does not implement feature')
 tf.app.flags.DEFINE_boolean('special_unks', False, 'Use special unks for decoding and training')
 tf.app.flags.DEFINE_string('cbow_model', '', 'Use CBOW predictions for decoding and training')
-tf.app.flags.DEFINE_float32('replace_prob', 1.0, 'Replace prob for CBOW substitutions')
+tf.app.flags.DEFINE_float('replace_prob', 1.0, 'Replace prob for CBOW substitutions')
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -35,7 +35,7 @@ class Chat_Session_UNKS(object):
 	'''CHAT CLASS with UNKS tweaks: has the special unks functionality. options for greedy and argmax decoder, 
 	and loading a pre-trained CBOW model to guess unknown words'''
 
-	def __init__(self, sess, vocabulary_file_path, rev_vocabulary_file_path):
+	def __init__(self, sess):
 
 		#keep track of tokens - not indexes - for legibility
 		self.query_log = []
@@ -130,7 +130,7 @@ class Chat_Session_UNKS(object):
 			query = utils.format( self.read_query() )
 			
 			#transform query to idx
-			idx_query, special_unk_assignments, cbow_guesses = modified_utils.sentence_to_idx(query, self.vocabulary, cbow_model=self.cbow_model, replace_prob=FLAGS.replace_prob)
+			idx_query, special_unk_assignments, cbow_guesses = modified_utils.sentence_to_idx(query, self.vocabulary, cbow=self.cbow_model, replace_prob=FLAGS.replace_prob)
 
 			#compute response to user query
 			idx_response = self.respond(idx_query)
@@ -142,7 +142,7 @@ class Chat_Session_UNKS(object):
 			reversed_special_unk_assignments = {val: key for key, val in special_unk_assignments.iteritems()}
 
 			#see if any of the special_unk_assignment tokens are in the idx response
-			for i, idx in enumerate(idx_reponse):
+			for i, idx in enumerate(idx_response):
 				try:
 					response[i] = reversed_special_unk_assignments[idx]
 				except KeyError:
@@ -164,7 +164,7 @@ class Chat_Session_UNKS(object):
 					response[i] = reversed_cbow_guesses[token]
 
 			#print response
-			print ('\nBOT: ' + response + '\n')
+			print ('\nBOT: ' + ' '.join(i for i in response) + '\n')
 
 			#log user query and response
 			self.query_log.append(query)
@@ -247,7 +247,7 @@ class Chat_Session(object):
 
 	'''ORIGINAL CHAT CLASS: this has the default behavior, with options for greedy vs sampled decoding, and edit distance''' 
 
-	def __init__(self, sess, vocabulary_file_path, rev_vocabulary_file_path):
+	def __init__(self, sess):
 
 		#keep track of tokens - not indexes - for legibility
 		self.query_log = []
@@ -394,9 +394,9 @@ def main():
 
 		#load up the appropriate chat session object
 		if FLAGS.special_unks:
-			chat_session = Chat_Session_UNKS(sess, vocabulary, reverse_vocabulary)
+			chat_session = Chat_Session_UNKS(sess)
 		else:
-			chat_session = Chat_Session(sess, vocabulary, reverse_vocabulary)
+			chat_session = Chat_Session(sess)
 		
 		if len(FLAGS.simulate_file):
 			

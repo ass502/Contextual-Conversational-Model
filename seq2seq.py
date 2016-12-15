@@ -183,7 +183,7 @@ class seq2seq_model(object):
 			return None, outputs[0], outputs[1:]  # No gradient norm, loss, outputs.
 
 
-	def get_batch(self, data, bucket_id, input_batch_size=None):
+	def get_batch(self, data, bucket_id, input_batch_size=None, input_batch_index=None):
 		encoder_size, decoder_size = self.buckets[bucket_id]
 		encoder_inputs, decoder_inputs = [], []
 
@@ -209,7 +209,7 @@ class seq2seq_model(object):
 			#instead of getting a random batch, select the appropriate number at once from the data
 			# pad them if needed, reverse encoder inputs and add GO to decoder.
 			for i in xrange(batch_size):
-				encoder_input, decoder_input = data[bucket_id][i]
+				encoder_input, decoder_input = data[bucket_id][input_batch_index*batch_size+i]
 
 				# Encoder inputs are padded, but not reversed in the conversational setting
 				encoder_pad = [utils.PAD_ID] * (encoder_size - len(encoder_input))

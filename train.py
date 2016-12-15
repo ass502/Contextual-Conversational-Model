@@ -19,7 +19,7 @@ import seq2seq
 
 #patience_threshold = 1
 MAX_NUM_STEPS = 50000
-vocab_size = 50000
+vocab_size = 100000
 size = 1024
 num_layers = 2
 max_gradient_norm = 5.0
