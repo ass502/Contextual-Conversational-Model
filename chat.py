@@ -20,8 +20,8 @@ import re
 
 tf.app.flags.DEFINE_boolean('interactive_chat', True, 'Talk to a user!')
 tf.app.flags.DEFINE_string('simulate_file', '', 'File to read in for simulation')
-tf.app.flags.DEFINE_string('checkpoint_dir', './models/debug_dir_UNK/', 'Checkpoint directory.')
-tf.app.flags.DEFINE_string('vocab_dir', './data/data_idx_files/small_model_100000_unks/', 'Checkpoint directory.')
+tf.app.flags.DEFINE_string('checkpoint_dir', './models/debug_dir/', 'Checkpoint directory.')
+tf.app.flags.DEFINE_string('vocab_dir', './data/data_idx_files/small_model_100000/', 'Checkpoint directory.')
 tf.app.flags.DEFINE_boolean('argmax_decoder', True, 'How to decode')
 tf.app.flags.DEFINE_integer('sample_k', None, 'Top k logits to sample for in sampled decoding - None samples over all words')
 tf.app.flags.DEFINE_integer('edit_threshold', None, 'Threshold for edit distance - None does not implement feature')
@@ -165,11 +165,12 @@ class Chat_Session_UNKS(object):
 					response[i] = reversed_cbow_guesses[token]
 
 			#print response
-			print ('\nBOT: ' + ' '.join(i for i in response) + '\n')
+			response_str = ' '.join(i for i in response)
+			print ('\nBOT: ' + response_str + '\n')
 
 			#log user query and response
 			self.query_log.append(query)
-			self.response_log.append(response)
+			self.response_log.append(response_str)
 			
 
 	def simulate(self, file_path):
@@ -182,10 +183,10 @@ class Chat_Session_UNKS(object):
 			for query in queries:
 
 				#read user query and transform it to match corpus format
-				query = utils.format( query() )
+				query = modified_utils.format( query )
 				
 				#transform query to idx
-				idx_query, special_unk_assignments, cbow_guesses = modified_utils.sentence_to_idx(query, self.vocabulary, cbow_model=self.cbow_model, replace_prob=FLAGS.replace_prob)
+				idx_query, special_unk_assignments, cbow_guesses = modified_utils.sentence_to_idx(query, self.vocabulary, cbow=self.cbow_model, replace_prob=FLAGS.replace_prob)
 
 				#compute response to user query
 				idx_response = self.respond(idx_query)
@@ -197,16 +198,16 @@ class Chat_Session_UNKS(object):
 				reversed_special_unk_assignments = {val: key for key, val in special_unk_assignments.iteritems()}
 
 				#see if any of the special_unk_assignment tokens are in the idx response
-				for i, idx in enumerate(idx_reponse):
+				for i, vocab_idx in enumerate(idx_response):
 					try:
-						response[i] = reversed_special_unk_assignments[idx]
+						response[i] = reversed_special_unk_assignments[vocab_idx]
 					except KeyError:
 						pass
 
 				#do normal vocabulary mapping for everything else
-				for i, idx in enumerate(idx_response):
+				for i, vocab_idx in enumerate(idx_response):
 					try:
-						response[i] = self.reverse_vocabulary[i]
+						response[i] = self.reverse_vocabulary[vocab_idx]
 					except KeyError:
 						response[i] = self.reverse_vocabulary['_UNK_']
 
@@ -219,11 +220,11 @@ class Chat_Session_UNKS(object):
 						response[i] = reversed_cbow_guesses[token]
 
 				#print response
-				print ('\nBOT: ' + response + '\n')
+				#print ('\nBOT: ' + response + '\n')
 
 				#log user query and response
 				self.query_log.append(query)
-				self.response_log.append(response)
+				self.response_log.append(' '.join(i for i in response))
 
 
 	def save(self):
@@ -360,16 +361,13 @@ class Chat_Session(object):
 
 			idx_queries = [utils.sentence_to_idx(sentence, self.vocabulary, edit_token_threshold=FLAGS.edit_threshold, rev_vocabulary=self.reverse_vocabulary) for sentence in queries]
 
-			for idx_query in idx_queries:
+			for i, idx_query in enumerate(idx_queries):
 
 				#pass in query to model and decode response
-				idx_response = self.respond(idx_query)
-
-				#transform response to tokens
-				response = ' '.join([self.reverse_vocabulary[i] for i in idx_response])
+				response = self.respond(idx_query)
 
 				#record query and response
-				self.query_log.append(queries[idx])
+				self.query_log.append(queries[i])
 				self.response_log.append(response)
 
 

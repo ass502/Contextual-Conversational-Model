@@ -319,7 +319,10 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 					sentence_idx1[i] = vocabulary['_UNK_']
 
 				elif curr_token in cbow_guesses:
-					sentence_idx1[i] = cbow_guesses[curr_token]
+					try:
+						sentence_idx1[i] = cbow_guesses[curr_token]
+					except KeyError:
+						sentence_idx1[i] = vocabulary['_UNK_']
 
 				else:
 
@@ -337,6 +340,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 							sentence_idx1[i] = vocabulary[unk_pred]
 						except KeyError:
 							sentence_idx1[i] = vocabulary['_UNK_']
+
 
 					else:
 
@@ -356,7 +360,10 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 					sentence_idx2[i] = vocabulary['_UNK_']
 
 				elif curr_token in cbow_guesses:
-					sentence_idx2[i] = vocabulary[cbow_guesses[curr_token]]
+					try:
+						sentence_idx2[i] = vocabulary[cbow_guesses[curr_token]]
+					except KeyError:
+						sentence_idx2[i] = vocabulary['_UNK_']
 
 				else:
 
@@ -389,7 +396,7 @@ def pairs_to_idx(sentence1, sentence2, vocabulary, cbow=None, replace_prob=1):
 		if vocab_idx == -1:
 			sentence_idx2[idx] = token_to_idx(tokens2[idx].lower(), vocabulary)
 
-	return sentence_idx1, sentence_idx2
+	return sentence_idx1, sentence_idx2 
 
 
 def combine_adjacent_uppers(tokens):
@@ -620,7 +627,7 @@ def main():
 	cbow_model_path = 'cbow_model.bin'
 
 	c = fasttext.load_model(cbow_model_path, label_prefix='__label__')
-	create_train_dev_test_files(input_directory, output_directory, train_split=0.8, dev_split=0.1, vocab_size=100000, cbow=None)
+	create_train_dev_test_files(input_directory, output_directory, train_split=0.8, dev_split=0.1, vocab_size=100000, cbow=c)
 
 	'''
 	#how often does this proper noun use case occur
